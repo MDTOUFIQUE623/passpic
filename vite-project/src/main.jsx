@@ -404,6 +404,38 @@ const clerkAppearance = {
     // Force all text elements to be white using a catch-all rule
     '& *': {
       color: 'white !important'
+    },
+
+    // Add these new styles for the delete account section
+    dangerSection: {
+      backgroundColor: 'rgba(220, 38, 38, 0.1)',
+      borderRadius: '12px',
+      border: '1px solid rgba(220, 38, 38, 0.2)',
+      padding: '1.5rem',
+      marginTop: '2rem'
+    },
+    dangerSectionTitle: {
+      color: 'rgb(239, 68, 68) !important',
+      fontSize: '1.2rem',
+      fontWeight: '600'
+    },
+    dangerSectionText: {
+      color: 'rgba(255, 255, 255, 0.8) !important'
+    },
+    deleteParagraph: {
+      color: 'rgba(255, 255, 255, 0.8) !important'
+    },
+    deleteAccountButton: {
+      backgroundColor: 'rgb(220, 38, 38)',
+      color: 'white !important',
+      borderRadius: '8px',
+      padding: '0.75rem 1rem',
+      fontSize: '0.9rem',
+      transition: 'all 0.3s ease',
+      '&:hover': {
+        backgroundColor: 'rgb(185, 28, 28)',
+        transform: 'translateY(-1px)'
+      }
     }
   }
 }
