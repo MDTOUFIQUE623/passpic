@@ -14,12 +14,14 @@ const connectDB = async () => {
         const conn = await mongoose.connect(process.env.MONGODB_URI, {
             useNewUrlParser: true,
             useUnifiedTopology: true,
+            dbName: 'passpic'
         });
         
         console.log(`MongoDB Connected: ${conn.connection.host}`);
+        console.log(`Database: ${conn.connection.db.databaseName}`);
     } catch (error) {
         console.error("MongoDB connection error:", error);
-        process.exit(1); // Exit process with failure
+        process.exit(1);
     }
 }
 
