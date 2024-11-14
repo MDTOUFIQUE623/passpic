@@ -41,29 +41,57 @@ export const handleClerkWebhook = async (req, res) => {
     // Handle the webhook
     const eventType = evt.type
 
-    if (eventType === 'user.created' || eventType === 'user.updated') {
-        const { id, email_addresses, image_url, first_name, last_name } = evt.data
+    try {
+        switch (eventType) {
+            case 'user.created':
+            case 'user.updated': {
+                const { id, email_addresses, image_url, first_name, last_name } = evt.data
 
-        try {
-            const user = await userModel.findOneAndUpdate(
-                { clerkId: id },
-                {
-                    clerkId: id,
-                    email: email_addresses[0].email_address,
-                    photo: image_url,
-                    firstName: first_name,
-                    lastName: last_name
-                },
-                { upsert: true, new: true }
-            )
-            
-            console.log('User saved/updated:', user)
-            return res.status(200).json(user)
-        } catch (error) {
-            console.error('Error saving user:', error)
-            return res.status(500).json({ error: 'Error saving user' })
+                const user = await userModel.findOneAndUpdate(
+                    { clerkId: id },
+                    {
+                        clerkId: id,
+                        email: email_addresses[0].email_address,
+                        photo: image_url,
+                        firstName: first_name,
+                        lastName: last_name
+                    },
+                    { upsert: true, new: true }
+                )
+                
+                console.log(`User ${eventType === 'user.created' ? 'created' : 'updated'}:`, user)
+                return res.status(200).json(user)
+            }
+
+            case 'user.deleted': {
+                const { id } = evt.data
+                
+                const deletedUser = await userModel.findOneAndDelete({ clerkId: id })
+                
+                if (!deletedUser) {
+                    console.log('User not found in database:', id)
+                    return res.status(404).json({ message: 'User not found' })
+                }
+
+                console.log('User deleted:', deletedUser)
+                return res.status(200).json({ 
+                    message: 'User successfully deleted',
+                    user: deletedUser 
+                })
+            }
+
+            default:
+                console.log('Unhandled webhook event type:', eventType)
+                return res.status(200).json({ 
+                    message: `Webhook received: ${eventType}`,
+                    status: 'unhandled' 
+                })
         }
+    } catch (error) {
+        console.error(`Error processing ${eventType} webhook:`, error)
+        return res.status(500).json({ 
+            error: `Error processing ${eventType} webhook`,
+            details: error.message 
+        })
     }
-
-    return res.status(200).json({ message: 'Webhook received' })
 } 
