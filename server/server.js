@@ -14,7 +14,7 @@ app.use(cors())
 connectDB().catch(console.error);
 
 // API routes
-app.get('/', (req, res) => res.status(200).json({ message: "API Working" }))
+app.get('/', (req, res) => res.status(200).json("API Working"))
 
 // For local development
 if (process.env.NODE_ENV !== 'production') {
