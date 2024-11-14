@@ -1,0 +1,142 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+*{
+  font-family: Outfit;
+}
+
+.slider{
+  -webkit-appearance: none;
+  height: 100%;
+  background: transparent;
+}
+
+.slider::-webkit-slider-thumb{
+  appearance:none;
+  width:30px;
+  min-height:30px;
+  background-image: url(/slide_icon.svg) ;
+  background-position: centerl;
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+
+.bg-layer{
+  background-image: url(/bg_layer.png);
+}
+
+:root {
+  color-scheme: dark;
+}
+
+@layer base {
+  body {
+    @apply bg-[#0B1120] text-gray-100;
+  }
+}
+
+@layer utilities {
+  .bg-grid-pattern {
+    background-image: 
+      linear-gradient(to right, #ffffff 1px, transparent 1px),
+      linear-gradient(to bottom, #ffffff 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+
+  .bg-scan-lines {
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(255, 255, 255, 0.1) 2px,
+      rgba(255, 255, 255, 0.1) 4px
+    );
+  }
+
+  .animate-pulse-slow {
+    animation: pulse 6s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  .animate-floating {
+    animation: floating 8s ease-in-out infinite;
+  }
+
+  .bg-cyber-grid {
+    background-image: 
+      linear-gradient(to right, rgba(255, 255, 255, 0.1) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.1) 1px, transparent 1px);
+    background-size: 50px 50px;
+    opacity: 0.05;
+  }
+}
+
+@keyframes floating {
+  0%, 100% {
+    transform: translate(-50%, -50%) translateY(-10px) rotate(-1deg);
+  }
+  50% {
+    transform: translate(-50%, -50%) translateY(10px) rotate(1deg);
+  }
+}
+
+@keyframes glitch {
+  0% {
+    clip-path: inset(50% 0 50% 0);
+  }
+  5% {
+    clip-path: inset(20% 0 80% 0);
+  }
+  10% {
+    clip-path: inset(80% 0 20% 0);
+  }
+  15% {
+    clip-path: inset(40% 0 60% 0);
+  }
+  20% {
+    clip-path: inset(60% 0 40% 0);
+  }
+  25% {
+    clip-path: inset(0 0 100% 0);
+  }
+  100% {
+    clip-path: inset(50% 0 50% 0);
+  }
+}
+
+/* Enhanced text selection */
+::selection {
+  @apply bg-orange-500/30 text-white;
+  text-shadow: 0 0 8px rgba(255, 126, 0, 0.5);
+}
+
+/* Add these at the end of your index.css file */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(200%);
+  }
+}
