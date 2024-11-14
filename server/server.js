@@ -8,20 +8,33 @@ import userRouter from './routes/userRoutes.js'
 const app = express()
 
 // Initialize Middleware
-app.use(express.json())
+app.use(express.json({ limit: '10mb' }))
 app.use(cors())
 
 // Connect to MongoDB
-connectDB().catch(console.error);
+connectDB().catch(err => {
+    console.error("Failed to connect to MongoDB:", err);
+    process.exit(1);
+});
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+    console.error(err.stack);
+    res.status(500).json({ 
+        success: false, 
+        message: 'Something broke!',
+        error: process.env.NODE_ENV === 'development' ? err.message : 'Internal Server Error'
+    });
+});
 
 // API routes
 app.get('/', (req, res) => res.send("API Working"))
-app.use('/api/user',userRouter)
+app.use('/api/user', userRouter)
 
 // For local development
 if (process.env.NODE_ENV !== 'production') {
     const PORT = process.env.PORT || 4000
-    app.listen(PORT, () => console.log("Server Running on port " + PORT))
+    app.listen(PORT, () => console.log(`Server Running on port ${PORT}`))
 }
 
 export default app;

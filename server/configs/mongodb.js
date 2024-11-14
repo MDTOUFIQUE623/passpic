@@ -7,15 +7,19 @@ const connectDB = async () => {
             return;
         }
 
-        await mongoose.connect(`${process.env.MONGODB_URI}/passpic`, {
+        if (!process.env.MONGODB_URI) {
+            throw new Error('MONGODB_URI is not defined in environment variables');
+        }
+
+        const conn = await mongoose.connect(process.env.MONGODB_URI, {
             useNewUrlParser: true,
             useUnifiedTopology: true,
         });
         
-        console.log("Database Connected");
+        console.log(`MongoDB Connected: ${conn.connection.host}`);
     } catch (error) {
         console.error("MongoDB connection error:", error);
-        throw error;
+        process.exit(1); // Exit process with failure
     }
 }
 
