@@ -3,17 +3,23 @@ import express from 'express'
 import cors from 'cors'
 import connectDB from './configs/mongodb.js'
 
-
 // App Config
-const PORT = process.env.PORT || 4000
 const app = express()
-await connectDB()
 
 // Initialize Middleware
 app.use(express.json())
 app.use(cors())
 
-// API routes
-app.get('/',(req,res)=>res.send("API Working"))
+// Connect to MongoDB
+connectDB().catch(console.error);
 
-app.listen(PORT, ()=> console.log("Server Running on port "+PORT))
+// API routes
+app.get('/', (req, res) => res.status(200).json({ message: "API Working" }))
+
+// For local development
+if (process.env.NODE_ENV !== 'production') {
+    const PORT = process.env.PORT || 4000
+    app.listen(PORT, () => console.log("Server Running on port " + PORT))
+}
+
+export default app;
