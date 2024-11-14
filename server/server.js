@@ -3,12 +3,14 @@ import express from 'express'
 import cors from 'cors'
 import connectDB from './configs/mongodb.js'
 import userRouter from './routes/userRoutes.js'
+import webhookRouter from './routes/webhookRoutes.js'
 
 // App Config
 const app = express()
 
 // Initialize Middleware
 app.use(express.json({ limit: '10mb' }))
+app.use('/api/webhooks', express.raw({ type: 'application/json' }))
 app.use(cors())
 
 // Connect to MongoDB
@@ -30,6 +32,7 @@ app.use((err, req, res, next) => {
 // API routes
 app.get('/', (req, res) => res.send("API Working"))
 app.use('/api/user', userRouter)
+app.use('/api/webhooks', webhookRouter)
 
 // For local development
 if (process.env.NODE_ENV !== 'production') {
