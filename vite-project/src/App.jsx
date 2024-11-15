@@ -5,6 +5,8 @@ import Result from './pages/Result'
 import BuyCredit from './pages/BuyCredit'
 import Navbar from './components/Navbar'
 import Footer from './components/Footer'
+import { ToastContainer, toast } from 'react-toastify';
+  import 'react-toastify/dist/ReactToastify.css';
 
 const App = () => {
   return (
@@ -27,7 +29,7 @@ const App = () => {
         {/* Cyberpunk corner decorations */}
         <div className="absolute top-0 left-0 w-32 h-32 border-l-2 border-t-2 border-orange-500/20 rounded-tl-3xl" />
         <div className="absolute bottom-0 right-0 w-32 h-32 border-r-2 border-b-2 border-purple-600/20 rounded-br-3xl" />
-        
+        <ToastContainer position='bottom-right'/>
         <Navbar />
         <Routes>
           <Route path='/' element={<Home/>} />

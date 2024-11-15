@@ -1,12 +1,14 @@
-import React, { useState } from 'react'
+import React, { useState, useContext } from 'react'
 import { assets, plans } from '../assets/assets'
+import { AppContext } from '../context/AppContext'
 
 const BuyCredit = () => {
   const [billingCycle, setBillingCycle] = useState('monthly')
+  const { credit } = useContext(AppContext)
 
   const features = {
     free: {
-      credits: '5 Credits',
+      credits: '10 Credits',
       quality: 'Standard Quality',
       speed: 'Normal Processing',
       size: '5MB Upload Limit'
@@ -42,20 +44,43 @@ const BuyCredit = () => {
           Select the ideal plan for your passport photo needs. All plans include our AI-powered background removal and size optimization.
         </p>
 
-        {/* Billing Toggle */}
-        <div className='flex items-center justify-center gap-4 mt-8 mb-12'>
-          <div className={`px-4 py-2 rounded-full cursor-pointer transition-all duration-300 
-            ${billingCycle === 'monthly' ? 'bg-gradient-to-r from-purple-500 to-orange-400 text-white' : 'text-neutral-400'}`}
-            onClick={() => setBillingCycle('monthly')}
-          >
-            Monthly
-          </div>
-          <div className={`px-4 py-2 rounded-full cursor-pointer transition-all duration-300 
-            ${billingCycle === 'yearly' ? 'bg-gradient-to-r from-purple-500 to-orange-400 text-white' : 'text-neutral-400'}`}
-            onClick={() => setBillingCycle('yearly')}
-          >
-            Yearly
-            <span className='ml-2 text-xs bg-gradient-to-r from-purple-500 to-orange-400 text-white px-2 py-0.5 rounded-full'>Save 20%</span>
+        <div className='text-center mb-8'>
+          <p className='text-neutral-200'>
+            Current Credits: <span className='text-orange-400 font-bold'>{credit}</span>
+          </p>
+        </div>
+
+        {/* Updated Billing Toggle - Without Dark Background */}
+        <div className='flex items-center justify-center mt-8 mb-12'>
+          <div className='relative rounded-full p-1 flex items-center'>
+            {/* Sliding Background */}
+            <div
+              className={`absolute h-full top-[50%] translate-y-[-50%] w-[48%] 
+              bg-gradient-to-r from-purple-500 to-orange-400 rounded-full 
+              transition-all duration-300 ease-in-out
+              ${billingCycle === 'monthly' ? 'left-[2%]' : 'left-[50%]'}`}
+            />
+            
+            {/* Monthly Button */}
+            <div
+              className={`px-4 py-2 rounded-full cursor-pointer z-10 transition-colors duration-300
+                ${billingCycle === 'monthly' ? 'text-white' : 'text-neutral-400'}`}
+              onClick={() => setBillingCycle('monthly')}
+            >
+              Monthly
+            </div>
+            
+            {/* Yearly Button */}
+            <div
+              className={`px-4 py-2 rounded-full cursor-pointer z-10 transition-colors duration-300
+                ${billingCycle === 'yearly' ? 'text-white' : 'text-neutral-400'}`}
+              onClick={() => setBillingCycle('yearly')}
+            >
+              Yearly
+              <span className='ml-2 text-xs bg-white/20 text-white px-2 py-0.5 rounded-full'>
+                Save 20%
+              </span>
+            </div>
           </div>
         </div>
       </div>

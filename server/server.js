@@ -4,6 +4,7 @@ import cors from 'cors'
 import connectDB from './configs/mongodb.js'
 import userRouter from './routes/userRoutes.js'
 import webhookRouter from './routes/webhookRoutes.js'
+import imageRouter from './routes/imageRoutes.js'
 
 // App Config
 const app = express()
@@ -33,6 +34,7 @@ app.use((err, req, res, next) => {
 app.get('/', (req, res) => res.send("API Working"))
 app.use('/api/user', userRouter)
 app.use('/api/webhooks', webhookRouter)
+app.use('/api/image',imageRouter)
 
 // For local development
 if (process.env.NODE_ENV !== 'production') {
