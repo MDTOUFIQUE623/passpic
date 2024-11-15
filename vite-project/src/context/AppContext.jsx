@@ -33,12 +33,14 @@ const AppContextProvider = (props) => {
             
             const token = await getToken();
             const response = await axios.get(`${backendUrl}/api/user/credits`, {
-                headers: { token }
+                headers: { 
+                    token,
+                    'Content-Type': 'application/json'
+                }
             });
 
             if (response.data.success) {
                 setCredit(response.data.credits);
-                console.log("", response.data.credits);
             } else {
                 throw new Error(response.data.message);
             }
@@ -68,7 +70,7 @@ const AppContextProvider = (props) => {
             setResultImage(false);
             navigate('/result');
 
-            // Step 1: Remove Background
+            // Remove Background
             setProcessingStep('Removing background...');
             const token = await getToken();
             const formData = new FormData();
@@ -84,25 +86,10 @@ const AppContextProvider = (props) => {
                 throw new Error(data.message);
             }
 
-            // Step 2: Create passport photo
-            setProcessingStep('Processing passport photo...');
-            
-            // Create an image element from the background-removed image
-            const img = new Image();
-            await new Promise((resolve, reject) => {
-                img.onload = resolve;
-                img.onerror = reject;
-                img.src = data.resultImage;
-            });
-
-            // Process the image into passport format
-            const passportPhoto = await createPassportPhoto(img);
-            
-            // Update state with final result
-            setResultImage(passportPhoto);
+            // Update state with background removed image
+            setResultImage(data.resultImage);
             data.creditBalance && setCredit(data.creditBalance);
-            setProcessingStep('');
-            toast.success('Passport photo created successfully!');
+            toast.success('Background removed successfully!');
             
         } catch (error) {
             console.error('Error processing image:', error);
@@ -117,6 +104,25 @@ const AppContextProvider = (props) => {
         }
     };
 
+    const convertToPassport = async (backgroundRemovedImage) => {
+        try {
+            // Create an image element from the background-removed image
+            const img = new Image();
+            await new Promise((resolve, reject) => {
+                img.onload = resolve;
+                img.onerror = reject;
+                img.src = backgroundRemovedImage;
+            });
+
+            // Process the image into passport format
+            const passportPhoto = await createPassportPhoto(img);
+            return passportPhoto;
+        } catch (error) {
+            console.error('Error converting to passport size:', error);
+            throw error;
+        }
+    };
+
     const value = {
         credit,
         setCredit,
@@ -126,7 +132,8 @@ const AppContextProvider = (props) => {
         processImage,
         resultImage,setResultImage,
         isProcessing,
-        processingStep
+        processingStep,
+        convertToPassport,
     }
 
     return (

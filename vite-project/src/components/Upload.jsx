@@ -1,7 +1,7 @@
 import React, { useContext } from 'react'
 import { assets } from '../assets/assets'
 import { AppContext } from '../context/AppContext'
-import { toast } from 'react-hot-toast'
+import { toast } from 'react-toastify'
 
 const Upload = () => {
   const { processImage } = useContext(AppContext)

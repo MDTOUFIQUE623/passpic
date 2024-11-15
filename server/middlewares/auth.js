@@ -1,24 +1,36 @@
 import jwt from 'jsonwebtoken'
 
-// Middleware Function to decode jwt token to get clerkId
-const authUser = async (req,res,next) => {
-
+const authUser = async (req, res, next) => {
     try {
-        
-        const {token} = req.headers
+        const token = req.headers.token;
 
         if (!token) {
-            return res.json({success:false,message:"Not Authorized Login Again"})
+            return res.status(401).json({
+                success: false,
+                message: "Not Authorized, Login Again"
+            });
         }
 
-        const token_decode = jwt.decode(token)
-        req.body.clerkId = token_decode.clerkId
-        next()
+        // Decode the token to get clerkId
+        const decoded = jwt.decode(token);
+        
+        if (!decoded || !decoded.sub) {  // Clerk uses 'sub' for the user ID
+            return res.status(401).json({
+                success: false,
+                message: "Invalid token"
+            });
+        }
+
+        req.body.clerkId = decoded.sub;  // Use 'sub' as clerkId
+        next();
 
     } catch (error) {
-        console.log(error.message);
-        res.json({success:false,message:error.message})
+        console.error('Auth middleware error:', error);
+        res.status(401).json({
+            success: false,
+            message: error.message || "Authentication failed"
+        });
     }
-}
+};
 
-export default authUser
+export default authUser;
