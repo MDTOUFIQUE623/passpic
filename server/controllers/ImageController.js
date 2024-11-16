@@ -1,5 +1,5 @@
 import axios from "axios";
-import fs from 'fs'
+import fs from 'fs';
 import FormData from "form-data";
 import userModel from "../models/userModel.js";
 import sharp from 'sharp';
@@ -8,36 +8,51 @@ import path from 'path';
 
 const unlinkAsync = promisify(fs.unlink);
 
-// Helper function to optimize image before processing
-const optimizeImage = async (inputPath, maxSize = 5000) => {
-    const stats = await sharp(inputPath).metadata();
-    
-    if (Math.max(stats.width, stats.height) > maxSize) {
-        const tempPath = `${inputPath}_optimized`;
+// Helper function to optimize image
+const optimizeImage = async (inputPath) => {
+    try {
+        const outputPath = `${inputPath}_optimized.jpg`;
+        
+        // Get image metadata
+        const metadata = await sharp(inputPath).metadata();
+        
+        // Calculate target dimensions while maintaining aspect ratio
+        const MAX_DIMENSION = 4000;
+        let width = metadata.width;
+        let height = metadata.height;
+        
+        if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
+            const ratio = Math.min(MAX_DIMENSION / width, MAX_DIMENSION / height);
+            width = Math.round(width * ratio);
+            height = Math.round(height * ratio);
+        }
+
+        // Optimize image
         await sharp(inputPath)
-            .resize(maxSize, maxSize, {
+            .resize(width, height, {
                 fit: 'inside',
                 withoutEnlargement: true
             })
-            .toFile(tempPath);
-            
+            .jpeg({
+                quality: 85,
+                progressive: true
+            })
+            .toFile(outputPath);
+
+        // Replace original with optimized version
         await unlinkAsync(inputPath);
-        await fs.promises.rename(tempPath, inputPath);
-    }
-    
-    // Convert to PNG format for better compatibility
-    const pngPath = `${inputPath}.png`;
-    await sharp(inputPath)
-        .png()
-        .toFile(pngPath);
+        await fs.promises.rename(outputPath, inputPath);
         
-    await unlinkAsync(inputPath);
-    return pngPath;
+        return inputPath;
+    } catch (error) {
+        console.error('Error optimizing image:', error);
+        throw error;
+    }
 };
 
 // Controller function to remove bg from image
 const removeBgImage = async (req, res) => {
-    let optimizedImagePath = null;
+    let imagePath = null;
     
     try {
         const { clerkId } = req.body;
@@ -62,21 +77,23 @@ const removeBgImage = async (req, res) => {
             });
         }
 
-        // Optimize image before processing
-        optimizedImagePath = await optimizeImage(req.file.path);
-        
-        // Create form data with optimized image
-        const formData = new FormData();
-        formData.append('image_file', fs.createReadStream(optimizedImagePath));
+        imagePath = req.file.path;
 
-        // Make multiple attempts to remove background
+        // Optimize image if needed
+        imagePath = await optimizeImage(imagePath);
+
+        // Create form data
+        const formData = new FormData();
+        formData.append('image_file', fs.createReadStream(imagePath));
+
+        // Make API request with retries
+        let response = null;
         let attempts = 0;
         const maxAttempts = 3;
-        let error = null;
 
-        while (attempts < maxAttempts) {
+        while (attempts < maxAttempts && !response) {
             try {
-                const response = await axios.post(
+                response = await axios.post(
                     'https://clipdrop-api.co/remove-background/v1',
                     formData,
                     {
@@ -87,54 +104,51 @@ const removeBgImage = async (req, res) => {
                         responseType: 'arraybuffer',
                         maxContentLength: Infinity,
                         maxBodyLength: Infinity,
-                        timeout: 30000 // 30 second timeout
+                        timeout: 60000 // 60 second timeout
                     }
                 );
-
-                // Process successful response
-                const base64Image = Buffer.from(response.data, 'binary').toString('base64');
-                const resultImage = `data:image/png;base64,${base64Image}`;
-
-                // Update credit balance
-                const updatedUser = await userModel.findByIdAndUpdate(
-                    user._id,
-                    { $inc: { creditBalance: -1 } },
-                    { new: true }
-                );
-
-                // Clean up files
-                await unlinkAsync(optimizedImagePath);
-
-                return res.json({
-                    success: true,
-                    resultImage,
-                    creditBalance: updatedUser.creditBalance,
-                    message: 'Background Removed Successfully'
-                });
-
-            } catch (attemptError) {
-                error = attemptError;
+            } catch (error) {
                 attempts++;
-                await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second before retrying
+                if (attempts === maxAttempts) throw error;
+                await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds before retry
             }
         }
 
-        // If all attempts failed, throw the last error
-        throw error;
+        // Process response
+        const base64Image = Buffer.from(response.data, 'binary').toString('base64');
+        const resultImage = `data:image/png;base64,${base64Image}`;
+
+        // Update credit balance
+        const updatedUser = await userModel.findByIdAndUpdate(
+            user._id,
+            { $inc: { creditBalance: -1 } },
+            { new: true }
+        );
+
+        // Clean up
+        if (imagePath && fs.existsSync(imagePath)) {
+            await unlinkAsync(imagePath);
+        }
+
+        return res.json({
+            success: true,
+            resultImage,
+            creditBalance: updatedUser.creditBalance,
+            message: 'Background Removed Successfully'
+        });
 
     } catch (error) {
         console.error('Error processing image:', error);
 
-        // Clean up files
-        if (optimizedImagePath && fs.existsSync(optimizedImagePath)) {
+        // Clean up on error
+        if (imagePath && fs.existsSync(imagePath)) {
             try {
-                await unlinkAsync(optimizedImagePath);
+                await unlinkAsync(imagePath);
             } catch (unlinkError) {
                 console.error('Error deleting temporary file:', unlinkError);
             }
         }
 
-        // Send appropriate error response
         return res.json({
             success: false,
             message: error.response?.data?.message || error.message || 'Failed to process image',
@@ -143,4 +157,4 @@ const removeBgImage = async (req, res) => {
     }
 };
 
-export { removeBgImage }
+export { removeBgImage };

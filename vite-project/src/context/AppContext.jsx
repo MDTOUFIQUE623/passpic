@@ -83,23 +83,36 @@ const AppContextProvider = (props) => {
             setResultImage(false);
             navigate('/result');
 
-            // Remove Background
-            setProcessingStep('Removing background...');
-            const token = await getToken();
+            // Validate file size
+            if (image.size > 50 * 1024 * 1024) { // 50MB
+                throw new Error('Image size should be less than 50MB');
+            }
+
+            setProcessingStep('Preparing image...');
+
+            // Create form data
             const formData = new FormData();
             formData.append('image', image);
 
+            setProcessingStep('Removing background...');
+            const token = await getToken();
+            
             const { data } = await axios.post(
                 `${backendUrl}/api/image/remove-bg`,
                 formData,
-                { headers: { token } }
+                { 
+                    headers: { 
+                        token,
+                        'Content-Type': 'multipart/form-data'
+                    },
+                    timeout: 60000 // 60 second timeout
+                }
             );
 
             if (!data.success) {
                 throw new Error(data.message);
             }
 
-            // Update state with background removed image
             setResultImage(data.resultImage);
             data.creditBalance && setCredit(data.creditBalance);
             toast.success('Background removed successfully!');
