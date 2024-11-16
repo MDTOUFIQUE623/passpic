@@ -10,8 +10,9 @@ import imageRouter from './routes/imageRoutes.js'
 const app = express()
 
 // Initialize Middleware
-app.use(express.json({ limit: '10mb' }))
+app.use(express.json({ limit: '15mb' }))
 app.use('/api/webhooks', express.raw({ type: 'application/json' }))
+app.use(express.urlencoded({ extended: true, limit: '15mb' }))
 app.use(cors())
 
 // Connect to MongoDB
