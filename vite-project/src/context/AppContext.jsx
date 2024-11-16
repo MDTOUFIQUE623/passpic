@@ -104,20 +104,22 @@ const AppContextProvider = (props) => {
             }
 
             try {
-                const { data } = await axios.post(
-                    `${backendUrl}/api/image/remove-bg`,
-                    formData,
-                    { 
-                        headers: { 
-                            token,
-                            'Content-Type': 'multipart/form-data'
-                        },
-                        timeout: 120000, // 2 minute timeout
-                        maxContentLength: Infinity,
-                        maxBodyLength: Infinity,
-                        withCredentials: true
-                    }
-                );
+                console.log('Making request to:', `${backendUrl}/api/image/remove-bg`);
+                const { data } = await axios({
+                    method: 'post',
+                    url: `${backendUrl}/api/image/remove-bg`,
+                    data: formData,
+                    headers: { 
+                        'token': token,
+                        'Content-Type': 'multipart/form-data'
+                    },
+                    timeout: 120000,
+                    maxContentLength: Infinity,
+                    maxBodyLength: Infinity,
+                    withCredentials: true
+                });
+
+                console.log('Response received:', data);
 
                 if (!data.success) {
                     throw new Error(data.message || 'Failed to process image');
@@ -129,12 +131,13 @@ const AppContextProvider = (props) => {
             } catch (error) {
                 console.error('API Error:', error);
                 if (error.response) {
-                    // Server responded with error
+                    console.error('Error response:', error.response.data);
                     throw new Error(error.response.data.message || 'Server error');
                 } else if (error.request) {
-                    // Request made but no response
+                    console.error('No response received');
                     throw new Error('Network error. Please check your connection and try again.');
                 } else {
+                    console.error('Error setting up request:', error.message);
                     throw error;
                 }
             }
