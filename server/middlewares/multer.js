@@ -1,34 +1,12 @@
 import multer from "multer";
 
-// Configure multer to store files in memory
-const storage = multer.memoryStorage();
-
-// File filter function
-const fileFilter = (req, file, cb) => {
-    const allowedMimes = [
-        'image/jpeg',
-        'image/jpg',
-        'image/png',
-        'image/gif',
-        'image/webp',
-        'image/heic',
-        'image/heif'
-    ];
-
-    if (allowedMimes.includes(file.mimetype)) {
-        cb(null, true);
-    } else {
-        cb(new Error('Invalid file type. Only images are allowed.'));
+// creating multer middleware for parsing formdata
+const storage = multer.diskStorage({
+    filename: function(re,file,callback){
+        callback(null, `${Date.now()}_${file.originalname}`)
     }
-};
+})
 
-// Configure multer with increased size limit
-const upload = multer({
-    storage: storage,
-    fileFilter: fileFilter,
-    limits: {
-        fileSize: 50 * 1024 * 1024, // 50MB max file size
-    }
-});
+const upload = multer({storage})
 
-export default upload;
+export default upload

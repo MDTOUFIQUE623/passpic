@@ -83,77 +83,31 @@ const AppContextProvider = (props) => {
             setResultImage(false);
             navigate('/result');
 
-            setProcessingStep('Preparing image...');
-
             // Create form data
             const formData = new FormData();
             formData.append('image', image);
 
             setProcessingStep('Removing background...');
+            const token = await getToken();
             
-            let token;
-            try {
-                token = await getToken();
-            } catch (error) {
-                console.error('Error getting token:', error);
-                throw new Error('Authentication failed. Please try logging in again.');
-            }
-
-            if (!token) {
-                throw new Error('Authentication token not available');
-            }
-
-            try {
-                console.log('Making request to:', `${backendUrl}/api/image/remove-bg`);
-                
-                // Create headers object
-                const headers = {
-                    'token': token,
-                    'Content-Type': 'multipart/form-data'
-                };
-
-                // Make the request
-                const response = await axios.post(
-                    `${backendUrl}/api/image/remove-bg`,
-                    formData,
-                    {
-                        headers: headers,
-                        timeout: 180000, // 3 minute timeout
-                        maxContentLength: Infinity,
-                        maxBodyLength: Infinity
+            const { data } = await axios.post(
+                `${backendUrl}/api/image/remove-bg`,
+                formData,
+                { 
+                    headers: { 
+                        token,
+                        'Content-Type': 'multipart/form-data'
                     }
-                );
-
-                const data = response.data;
-                console.log('Response received:', data);
-
-                if (!data.success) {
-                    throw new Error(data.message || 'Failed to process image');
                 }
+            );
 
-                setResultImage(data.resultImage);
-                data.creditBalance && setCredit(data.creditBalance);
-                toast.success('Background removed successfully!');
-                
-            } catch (error) {
-                console.error('API Error:', error);
-                
-                // Log detailed error information
-                if (error.response) {
-                    console.error('Error response:', {
-                        status: error.response.status,
-                        data: error.response.data,
-                        headers: error.response.headers
-                    });
-                    throw new Error(error.response.data?.message || `Server error: ${error.response.status}`);
-                } else if (error.request) {
-                    console.error('No response received:', error.request);
-                    throw new Error('Network error. The server is not responding. Please try again later.');
-                } else {
-                    console.error('Error setting up request:', error.message);
-                    throw error;
-                }
+            if (!data.success) {
+                throw new Error(data.message);
             }
+
+            setResultImage(data.resultImage);
+            data.creditBalance && setCredit(data.creditBalance);
+            toast.success('Background removed successfully!');
             
         } catch (error) {
             console.error('Error processing image:', error);
@@ -161,8 +115,6 @@ const AppContextProvider = (props) => {
             
             if (error.message.includes('credit') && credit === 0) {
                 navigate('/buy');
-            } else if (error.message.includes('auth')) {
-                openSignIn();
             }
         } finally {
             setIsProcessing(false);
