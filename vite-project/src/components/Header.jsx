@@ -27,9 +27,9 @@ const Header = () => {
         return;
       }
 
-      const maxSize = 50 * 1024 * 1024; // 50MB
+      const maxSize = 5 * 1024 * 1024; // 5MB
       if (file.size > maxSize) {
-        toast.error('Image size should be less than 50MB');
+        toast.error('Image size should be less than 5MB');
         return;
       }
 
