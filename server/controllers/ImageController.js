@@ -26,7 +26,7 @@ const removeBgImage = async (req, res) => {
         const formdata = new FormData()
         formdata.append('image_file', imageFile)
 
-        const { data } = await axios.post('https://clipdrop-api.co/remove-background/v1', formdata, {
+        const { data } = await axios.post('https://api.developer.pixelcut.ai/v1/remove-background', formdata, {
             headers: {
                 'x-api-key': process.env.CLIPDROP_API,
             },

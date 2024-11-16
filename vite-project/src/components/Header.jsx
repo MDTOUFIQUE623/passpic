@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useContext } from 'react'
 import { assets } from '../assets/assets'
 import { AppContext } from '../context/AppContext';
+import { toast } from 'react-toastify';
 
 const Header = () => {
-
-  const { removeBg} = useContext(AppContext)
+  const { processImage } = useContext(AppContext);
 
   const [isScrolled, setIsScrolled] = useState(false);
 
@@ -17,6 +17,25 @@ const Header = () => {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      // Basic validation
+      if (!file.type.startsWith('image/')) {
+        toast.error('Please upload an image file');
+        return;
+      }
+
+      const maxSize = 5 * 1024 * 1024; // 5MB
+      if (file.size > maxSize) {
+        toast.error('Image size should be less than 5MB');
+        return;
+      }
+
+      processImage(file);
+    }
+  };
 
   return (
     <div className='flex items-center justify-between max-sm:flex-col-reverse gap-y-10 px-4 mt-5 lg:px-44 sm:mt-10'>    
@@ -32,7 +51,13 @@ const Header = () => {
           AI-powered background removal meets official requirements worldwide.
         </p>
         <div>
-            <input onChange={ e => removeBg(e.target.files[0])} type="file" accept='image/*' id="upload1" hidden/>
+            <input 
+              onChange={handleImageUpload} 
+              type="file" 
+              accept='image/*' 
+              id="upload1" 
+              hidden
+            />
             <label 
               className='inline-flex gap-3 px-8 py-3.5 rounded-full cursor-pointer bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-orange-500 hover:to-yellow-500 transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-orange-500/30'
               htmlFor="upload1"

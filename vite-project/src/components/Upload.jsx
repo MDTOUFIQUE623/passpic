@@ -57,18 +57,6 @@ const Upload = () => {
           />
           <p className='text-white text-sm'>Upload Your Photo</p>
         </label>
-
-        {/* Guidelines */}
-        <div className='mt-8 max-w-md mx-auto text-sm text-neutral-400'>
-          <p className='mb-2'>For best results:</p>
-          <ul className='space-y-1 text-left list-disc pl-4'>
-            <li>Use a clear, front-facing photo</li>
-            <li>Ensure good lighting</li>
-            <li>Use a plain background</li>
-            <li>Avoid wearing sunglasses or hats</li>
-            <li>Maximum file size: 5MB</li>
-          </ul>
-        </div>
       </div>
     </div>
   )

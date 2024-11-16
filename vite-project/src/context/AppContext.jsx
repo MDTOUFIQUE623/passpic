@@ -20,11 +20,24 @@ const AppContextProvider = (props) => {
     const navigate = useNavigate()
     const { openSignIn } = useClerk()
 
+    // Add model loading state
+    const [isModelLoaded, setIsModelLoaded] = useState(false);
+    const [isConverting, setIsConverting] = useState(false);
+    const [passportImage, setPassportImage] = useState(null);
+
+    // Load face detection model on mount
     useEffect(() => {
-        loadFaceDetectionModel().catch(error => {
-            console.error('Failed to load face detection model:', error);
-            toast.error('Failed to initialize face detection');
-        });
+        const loadModel = async () => {
+            try {
+                await loadFaceDetectionModel();
+                setIsModelLoaded(true);
+                console.log('Face detection model loaded successfully');
+            } catch (error) {
+                console.error('Error loading face detection model:', error);
+                toast.error('Failed to load face detection model');
+            }
+        };
+        loadModel();
     }, []);
 
     const loadCreditsData = async () => {
@@ -104,22 +117,27 @@ const AppContextProvider = (props) => {
         }
     };
 
-    const convertToPassport = async (backgroundRemovedImage) => {
-        try {
-            // Create an image element from the background-removed image
-            const img = new Image();
-            await new Promise((resolve, reject) => {
-                img.onload = resolve;
-                img.onerror = reject;
-                img.src = backgroundRemovedImage;
-            });
+    const handleConvertToPassport = async () => {
+        if (!resultImage) {
+            toast.error('Please remove background first');
+            return;
+        }
 
-            // Process the image into passport format
-            const passportPhoto = await createPassportPhoto(img);
-            return passportPhoto;
+        if (!isModelLoaded) {
+            toast.error('Face detection model is still loading');
+            return;
+        }
+
+        setIsConverting(true);
+        try {
+            const passportPhoto = await createPassportPhoto(resultImage);
+            setPassportImage(passportPhoto);
+            toast.success('Passport photo created successfully');
         } catch (error) {
-            console.error('Error converting to passport size:', error);
-            throw error;
+            console.error('Error creating passport photo:', error);
+            toast.error(error.message || 'Failed to create passport photo');
+        } finally {
+            setIsConverting(false);
         }
     };
 
@@ -128,12 +146,15 @@ const AppContextProvider = (props) => {
         setCredit,
         loadCreditsData,
         backendUrl,
-        image,setImage,
+        image, setImage,
         processImage,
-        resultImage,setResultImage,
+        resultImage, setResultImage,
         isProcessing,
         processingStep,
-        convertToPassport,
+        isConverting,
+        passportImage,
+        handleConvertToPassport,
+        isModelLoaded,
     }
 
     return (

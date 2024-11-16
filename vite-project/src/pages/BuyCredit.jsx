@@ -50,21 +50,27 @@ const BuyCredit = () => {
           </p>
         </div>
 
-        {/* Updated Billing Toggle - Without Dark Background */}
+        {/* Updated Billing Toggle */}
         <div className='flex items-center justify-center mt-8 mb-12'>
           <div className='relative rounded-full p-1 flex items-center'>
             {/* Sliding Background */}
             <div
-              className={`absolute h-full top-[50%] translate-y-[-50%] w-[48%] 
-              bg-gradient-to-r from-purple-500 to-orange-400 rounded-full 
-              transition-all duration-300 ease-in-out
-              ${billingCycle === 'monthly' ? 'left-[2%]' : 'left-[50%]'}`}
+              className={`absolute h-full top-0 rounded-full 
+              bg-gradient-to-r from-purple-500 to-orange-400
+              transition-all duration-500 ease-in-out
+              ${billingCycle === 'monthly' 
+                ? 'left-0 w-[80px]' // Width for "Monthly"
+                : 'left-[80px] w-[120px]' // Width and position for "Yearly"
+              }`}
+              style={{
+                boxShadow: '0 0 20px rgba(168, 85, 247, 0.2)'
+              }}
             />
             
             {/* Monthly Button */}
             <div
-              className={`px-4 py-2 rounded-full cursor-pointer z-10 transition-colors duration-300
-                ${billingCycle === 'monthly' ? 'text-white' : 'text-neutral-400'}`}
+              className={`w-[80px] py-2 text-center cursor-pointer z-10 transition-colors duration-300
+                ${billingCycle === 'monthly' ? 'text-white font-medium' : 'text-neutral-400'}`}
               onClick={() => setBillingCycle('monthly')}
             >
               Monthly
@@ -72,8 +78,8 @@ const BuyCredit = () => {
             
             {/* Yearly Button */}
             <div
-              className={`px-4 py-2 rounded-full cursor-pointer z-10 transition-colors duration-300
-                ${billingCycle === 'yearly' ? 'text-white' : 'text-neutral-400'}`}
+              className={`w-[120px] py-2 text-center cursor-pointer z-10 transition-colors duration-300
+                ${billingCycle === 'yearly' ? 'text-white font-medium' : 'text-neutral-400'}`}
               onClick={() => setBillingCycle('yearly')}
             >
               Yearly
