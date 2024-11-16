@@ -1,6 +1,5 @@
 import axios from "axios";
 import fs from 'fs'
-import FormData from "form-data";
 import userModel from "../models/userModel.js";
 
 // Controller function to remove bg from image
@@ -22,23 +21,29 @@ const removeBgImage = async (req, res) => {
 
         // Convert image to base64
         const imageBuffer = fs.readFileSync(imagePath);
-        const base64Image = imageBuffer.toString('base64');
+        const base64Image = `data:${req.file.mimetype};base64,${imageBuffer.toString('base64')}`;
 
         // Call PixelCut API
-        const { data } = await axios.post(
-            'https://api.developer.pixelcut.ai/v1/remove-background',
-            {
-                image_base64: base64Image,
-                format: 'png'
+        const response = await axios({
+            method: 'post',
+            url: 'https://api.developer.pixelcut.ai/v1/remove-background',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-API-KEY': 'sk_ed53e25114d842d7827b589cf8707bdf'
             },
-            {
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                    'X-API-KEY': 'sk_ed53e25114d842d7827b589cf8707bdf'
-                }
+            data: {
+                image_base64: base64Image,
+                format: 'png',
+                crop: false,
+                scale: 'original',
+                remove_shadow: true
             }
-        );
+        });
+
+        if (!response.data || !response.data.image_base64) {
+            throw new Error('Invalid response from PixelCut API');
+        }
 
         // Update credit balance
         const updatedUser = await userModel.findByIdAndUpdate(
@@ -52,13 +57,14 @@ const removeBgImage = async (req, res) => {
 
         res.json({
             success: true,
-            resultImage: data.image_url, // PixelCut returns the processed image URL
+            resultImage: response.data.image_base64, // Send the base64 image directly
             creditBalance: updatedUser.creditBalance,
             message: 'Background Removed'
         });
 
     } catch (error) {
         console.error('Error processing image:', error);
+        console.error('Error response:', error.response?.data); // Log the error response
         
         // Clean up temporary file if it exists
         if (req.file && req.file.path) {
@@ -69,9 +75,9 @@ const removeBgImage = async (req, res) => {
             }
         }
 
-        res.json({ 
+        res.status(error.response?.status || 500).json({ 
             success: false, 
-            message: error.message || 'Failed to process image'
+            message: error.response?.data?.message || error.message || 'Failed to process image'
         });
     }
 }
