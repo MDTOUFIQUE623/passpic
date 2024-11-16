@@ -5,14 +5,29 @@ import connectDB from './configs/mongodb.js'
 import userRouter from './routes/userRoutes.js'
 import webhookRouter from './routes/webhookRoutes.js'
 import imageRouter from './routes/imageRoutes.js'
+import fs from 'fs'
+import path from 'path'
+
+// Create uploads directory if it doesn't exist
+const uploadsDir = 'uploads'
+if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir)
+}
 
 // App Config
 const app = express()
 
 // Initialize Middleware
-app.use(express.json({ limit: '10mb' }))
+app.use(express.json({ limit: '50mb' }))
+app.use(express.urlencoded({ extended: true, limit: '50mb' }))
 app.use('/api/webhooks', express.raw({ type: 'application/json' }))
 app.use(cors())
+
+// Increase timeout
+app.use((req, res, next) => {
+    res.setTimeout(300000) // 5 minutes
+    next()
+})
 
 // Connect to MongoDB
 connectDB().catch(err => {
@@ -22,6 +37,15 @@ connectDB().catch(err => {
 
 // Error handling middleware
 app.use((err, req, res, next) => {
+    if (err instanceof multer.MulterError) {
+        if (err.code === 'LIMIT_FILE_SIZE') {
+            return res.status(400).json({
+                success: false,
+                message: 'File is too large. Maximum size is 25MB'
+            })
+        }
+    }
+    
     console.error(err.stack);
     res.status(500).json({ 
         success: false, 

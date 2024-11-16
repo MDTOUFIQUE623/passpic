@@ -2,74 +2,145 @@ import axios from "axios";
 import fs from 'fs'
 import FormData from "form-data";
 import userModel from "../models/userModel.js";
+import sharp from 'sharp';
+import { promisify } from 'util';
+import path from 'path';
+
+const unlinkAsync = promisify(fs.unlink);
+
+// Helper function to optimize image before processing
+const optimizeImage = async (inputPath, maxSize = 5000) => {
+    const stats = await sharp(inputPath).metadata();
+    
+    if (Math.max(stats.width, stats.height) > maxSize) {
+        const tempPath = `${inputPath}_optimized`;
+        await sharp(inputPath)
+            .resize(maxSize, maxSize, {
+                fit: 'inside',
+                withoutEnlargement: true
+            })
+            .toFile(tempPath);
+            
+        await unlinkAsync(inputPath);
+        await fs.promises.rename(tempPath, inputPath);
+    }
+    
+    // Convert to PNG format for better compatibility
+    const pngPath = `${inputPath}.png`;
+    await sharp(inputPath)
+        .png()
+        .toFile(pngPath);
+        
+    await unlinkAsync(inputPath);
+    return pngPath;
+};
 
 // Controller function to remove bg from image
 const removeBgImage = async (req, res) => {
+    let optimizedImagePath = null;
+    
     try {
-        const { clerkId } = req.body
+        const { clerkId } = req.body;
 
-        const user = await userModel.findOne({ clerkId })
-
+        // Validate user and credits
+        const user = await userModel.findOne({ clerkId });
         if (!user) {
-            return res.json({ success: false, message: "User Not Found" })
+            return res.json({ success: false, message: "User Not Found" });
         }
-
         if (user.creditBalance === 0) {
-            return res.json({ success: false, message: "No Credit Balance", creditBalance: user.creditBalance })
+            return res.json({ 
+                success: false, 
+                message: "No Credit Balance", 
+                creditBalance: user.creditBalance 
+            });
         }
 
-        const imagePath = req.file.path;
+        if (!req.file) {
+            return res.json({ 
+                success: false, 
+                message: "No image file provided" 
+            });
+        }
 
-        // Reading the image file
-        const imageFile = fs.createReadStream(imagePath)
+        // Optimize image before processing
+        optimizedImagePath = await optimizeImage(req.file.path);
+        
+        // Create form data with optimized image
+        const formData = new FormData();
+        formData.append('image_file', fs.createReadStream(optimizedImagePath));
 
-        const formdata = new FormData()
-        formdata.append('image_file', imageFile)
+        // Make multiple attempts to remove background
+        let attempts = 0;
+        const maxAttempts = 3;
+        let error = null;
 
-        const { data } = await axios.post('https://clipdrop-api.co/remove-background/v1', formdata, {
-            headers: {
-                'x-api-key': process.env.CLIPDROP_API,
-            },
-            responseType: 'arraybuffer'
-        })
+        while (attempts < maxAttempts) {
+            try {
+                const response = await axios.post(
+                    'https://clipdrop-api.co/remove-background/v1',
+                    formData,
+                    {
+                        headers: {
+                            'x-api-key': process.env.CLIPDROP_API,
+                            ...formData.getHeaders()
+                        },
+                        responseType: 'arraybuffer',
+                        maxContentLength: Infinity,
+                        maxBodyLength: Infinity,
+                        timeout: 30000 // 30 second timeout
+                    }
+                );
 
-        const base64Image = Buffer.from(data, 'binary').toString('base64')
-        const resultImage = `data:${req.file.mimetype};base64,${base64Image}`
+                // Process successful response
+                const base64Image = Buffer.from(response.data, 'binary').toString('base64');
+                const resultImage = `data:image/png;base64,${base64Image}`;
 
-        // Update credit balance
-        const updatedUser = await userModel.findByIdAndUpdate(
-            user._id, 
-            { $inc: { creditBalance: -1 } },
-            { new: true }
-        )
+                // Update credit balance
+                const updatedUser = await userModel.findByIdAndUpdate(
+                    user._id,
+                    { $inc: { creditBalance: -1 } },
+                    { new: true }
+                );
 
-        // Clean up the temporary file
-        fs.unlinkSync(imagePath)
+                // Clean up files
+                await unlinkAsync(optimizedImagePath);
 
-        res.json({
-            success: true,
-            resultImage,
-            creditBalance: updatedUser.creditBalance,
-            message: 'Background Removed'
-        })
+                return res.json({
+                    success: true,
+                    resultImage,
+                    creditBalance: updatedUser.creditBalance,
+                    message: 'Background Removed Successfully'
+                });
+
+            } catch (attemptError) {
+                error = attemptError;
+                attempts++;
+                await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second before retrying
+            }
+        }
+
+        // If all attempts failed, throw the last error
+        throw error;
 
     } catch (error) {
         console.error('Error processing image:', error);
-        
-        // Clean up temporary file if it exists
-        if (req.file && req.file.path) {
+
+        // Clean up files
+        if (optimizedImagePath && fs.existsSync(optimizedImagePath)) {
             try {
-                fs.unlinkSync(req.file.path);
+                await unlinkAsync(optimizedImagePath);
             } catch (unlinkError) {
                 console.error('Error deleting temporary file:', unlinkError);
             }
         }
 
-        res.json({ 
-            success: false, 
-            message: error.message || 'Failed to process image'
+        // Send appropriate error response
+        return res.json({
+            success: false,
+            message: error.response?.data?.message || error.message || 'Failed to process image',
+            error: process.env.NODE_ENV === 'development' ? error.toString() : undefined
         });
     }
-}
+};
 
 export { removeBgImage }
