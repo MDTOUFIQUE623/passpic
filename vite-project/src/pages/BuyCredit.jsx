@@ -5,7 +5,6 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@clerk/clerk-react'
 import { toast } from 'react-toastify'
 import axios from 'axios'
-import { log } from 'node:console'
 
 const BuyCredit = () => {
 
@@ -18,39 +17,61 @@ const BuyCredit = () => {
   const { getToken } =useAuth()
 
   const initPay = async (order) => {
+    try {
+        const options = {
+            key: import.meta.env.VITE_RAZORPAY_KEY_ID,
+            amount: order.amount,
+            currency: order.currency,
+            name: 'Passpic Credits',
+            description: "Credits Purchase",
+            order_id: order.id,
+            handler: async function (response) {
+                try {
+                    const token = await getToken()
+                    const verifyData = {
+                        razorpay_order_id: response.razorpay_order_id,
+                        razorpay_payment_id: response.razorpay_payment_id,
+                        razorpay_signature: response.razorpay_signature
+                    }
 
-    const options = {
-      key : import.meta.env.VITE_RAZORPAY_KEY_ID,
-      amount: order.amount,
-      currency: order.currency,
-      name: 'Credits Payment',
-      description: "Credits Payment",
-      order_id: order.id,
-      receipt: order.receipt,
-      handler: async (response) => {
-        console.log(response);
-        
-        const token = await getToken()
+                    const { data } = await axios.post(
+                        `${backendUrl}/api/user/verify-razor`,
+                        verifyData,
+                        { headers: { token } }
+                    )
 
-        try {
-          
-          const { data } = await axios.post(backendUrl+'/api/user/verify-razor',response,{headers:{token}})
-          if (data.success) {
-            loadCreditsData()
-            navigate('/')
-            toast.success('Credit Added')
-          }
-        } catch (error) {
-          console.log(error);
-          toast.error(error.message)
+                    if (data.success) {
+                        await loadCreditsData()
+                        navigate('/')
+                        toast.success('Credits added successfully!')
+                    } else {
+                        toast.error(data.message || 'Payment verification failed')
+                    }
+                } catch (error) {
+                    console.error('Payment verification error:', error)
+                    toast.error(error.message || 'Payment verification failed')
+                }
+            },
+            prefill: {
+                name: 'User',
+                email: 'user@example.com'
+            },
+            theme: {
+                color: '#9333EA'
+            }
         }
 
-      }
+        const rzp = new window.Razorpay(options)
+        rzp.on('payment.failed', function (response) {
+            console.error('Payment failed:', response.error)
+            toast.error('Payment failed. Please try again.')
+        })
+
+        rzp.open()
+    } catch (error) {
+        console.error('Payment initialization error:', error)
+        toast.error('Failed to initialize payment')
     }
-
-    const rzp = new window.Razorpay(options)
-    rzp.open()
-
   }
 
   const paymentRazorpay = async (planId) => {
