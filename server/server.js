@@ -5,30 +5,32 @@ import connectDB from './configs/mongodb.js'
 import userRouter from './routes/userRoutes.js'
 import webhookRouter from './routes/webhookRoutes.js'
 import imageRouter from './routes/imageRoutes.js'
-import fs from 'fs'
-import path from 'path'
-import { fileURLToPath } from 'url'
-
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
-
-// Create uploads directory with proper permissions
-const uploadsDir = path.join(__dirname, 'uploads')
-if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(uploadsDir, { recursive: true, mode: 0o777 })
-}
 
 // App Config
 const app = express()
 
-// Initialize Middleware with increased limits
-app.use(express.json({ limit: '50mb' }))
-app.use(express.urlencoded({ extended: true, limit: '50mb' }))
-app.use('/api/webhooks', express.raw({ type: 'application/json' }))
-app.use(cors())
+// Configure CORS with specific origins
+const corsOptions = {
+    origin: [
+        'http://localhost:5173',
+        'https://passpic-omega.vercel.app',
+        'https://passpic.vercel.app'
+    ],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'token', 'x-api-key'],
+    credentials: true
+};
 
-// Serve uploads directory statically
-app.use('/uploads', express.static(uploadsDir))
+// Initialize Middleware with increased limits
+app.use(cors(corsOptions));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use('/api/webhooks', express.raw({ type: 'application/json' }));
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+    res.status(200).json({ status: 'OK' });
+});
 
 // Connect to MongoDB
 connectDB().catch(err => {
@@ -38,33 +40,29 @@ connectDB().catch(err => {
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-    if (err.name === 'MulterError') {
-        if (err.code === 'LIMIT_FILE_SIZE') {
-            return res.status(400).json({
-                success: false,
-                message: 'File size is too large. Maximum size is 50MB'
-            });
-        }
-    }
-    
-    console.error(err.stack);
-    res.status(500).json({ 
-        success: false, 
-        message: 'Something broke!',
-        error: process.env.NODE_ENV === 'development' ? err.message : 'Internal Server Error'
+    console.error('Error:', err);
+    res.status(err.status || 500).json({
+        success: false,
+        message: err.message || 'Something broke!',
+        error: process.env.NODE_ENV === 'development' ? err.stack : 'Internal Server Error'
     });
 });
 
 // API routes
-app.get('/', (req, res) => res.send("API Working"))
-app.use('/api/user', userRouter)
-app.use('/api/webhooks', webhookRouter)
-app.use('/api/image',imageRouter)
+app.get('/', (req, res) => res.send("API Working"));
+app.use('/api/user', userRouter);
+app.use('/api/webhooks', webhookRouter);
+app.use('/api/image', imageRouter);
+
+// Handle 404
+app.use((req, res) => {
+    res.status(404).json({ success: false, message: 'Route not found' });
+});
 
 // For local development
 if (process.env.NODE_ENV !== 'production') {
-    const PORT = process.env.PORT || 4000
-    app.listen(PORT, () => console.log(`Server Running on port ${PORT}`))
+    const PORT = process.env.PORT || 4000;
+    app.listen(PORT, '0.0.0.0', () => console.log(`Server Running on port ${PORT}`));
 }
 
 export default app;

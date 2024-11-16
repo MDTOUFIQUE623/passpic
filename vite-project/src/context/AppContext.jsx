@@ -83,11 +83,6 @@ const AppContextProvider = (props) => {
             setResultImage(false);
             navigate('/result');
 
-            // Validate file size
-            if (image.size > 50 * 1024 * 1024) { // 50MB
-                throw new Error('Image size should be less than 50MB');
-            }
-
             setProcessingStep('Preparing image...');
 
             // Create form data
@@ -95,27 +90,54 @@ const AppContextProvider = (props) => {
             formData.append('image', image);
 
             setProcessingStep('Removing background...');
-            const token = await getToken();
             
-            const { data } = await axios.post(
-                `${backendUrl}/api/image/remove-bg`,
-                formData,
-                { 
-                    headers: { 
-                        token,
-                        'Content-Type': 'multipart/form-data'
-                    },
-                    timeout: 60000 // 60 second timeout
-                }
-            );
-
-            if (!data.success) {
-                throw new Error(data.message);
+            let token;
+            try {
+                token = await getToken();
+            } catch (error) {
+                console.error('Error getting token:', error);
+                throw new Error('Authentication failed. Please try logging in again.');
             }
 
-            setResultImage(data.resultImage);
-            data.creditBalance && setCredit(data.creditBalance);
-            toast.success('Background removed successfully!');
+            if (!token) {
+                throw new Error('Authentication token not available');
+            }
+
+            try {
+                const { data } = await axios.post(
+                    `${backendUrl}/api/image/remove-bg`,
+                    formData,
+                    { 
+                        headers: { 
+                            token,
+                            'Content-Type': 'multipart/form-data'
+                        },
+                        timeout: 120000, // 2 minute timeout
+                        maxContentLength: Infinity,
+                        maxBodyLength: Infinity,
+                        withCredentials: true
+                    }
+                );
+
+                if (!data.success) {
+                    throw new Error(data.message || 'Failed to process image');
+                }
+
+                setResultImage(data.resultImage);
+                data.creditBalance && setCredit(data.creditBalance);
+                toast.success('Background removed successfully!');
+            } catch (error) {
+                console.error('API Error:', error);
+                if (error.response) {
+                    // Server responded with error
+                    throw new Error(error.response.data.message || 'Server error');
+                } else if (error.request) {
+                    // Request made but no response
+                    throw new Error('Network error. Please check your connection and try again.');
+                } else {
+                    throw error;
+                }
+            }
             
         } catch (error) {
             console.error('Error processing image:', error);
@@ -123,6 +145,8 @@ const AppContextProvider = (props) => {
             
             if (error.message.includes('credit') && credit === 0) {
                 navigate('/buy');
+            } else if (error.message.includes('auth')) {
+                openSignIn();
             }
         } finally {
             setIsProcessing(false);
