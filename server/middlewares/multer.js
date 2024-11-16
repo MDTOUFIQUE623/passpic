@@ -1,12 +1,31 @@
 import multer from "multer";
 
-// creating multer middleware for parsing formdata
+// Configure storage
 const storage = multer.diskStorage({
-    filename: function(re,file,callback){
-        callback(null, `${Date.now()}_${file.originalname}`)
+    destination: function(req, file, cb) {
+        cb(null, '/tmp') // Use tmp directory for temporary storage
+    },
+    filename: function(req, file, cb) {
+        cb(null, `${Date.now()}_${file.originalname}`)
     }
-})
+});
 
-const upload = multer({storage})
+// Configure file filter
+const fileFilter = (req, file, cb) => {
+    // Accept images only
+    if (!file.originalname.match(/\.(jpg|jpeg|png|gif)$/)) {
+        return cb(new Error('Only image files are allowed!'), false);
+    }
+    cb(null, true);
+};
 
-export default upload
+// Create multer instance with configuration
+const upload = multer({
+    storage: storage,
+    limits: {
+        fileSize: 15 * 1024 * 1024, // 15 MB in bytes
+    },
+    fileFilter: fileFilter
+});
+
+export default upload;
