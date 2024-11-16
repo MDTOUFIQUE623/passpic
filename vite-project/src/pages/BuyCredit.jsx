@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@clerk/clerk-react'
 import { toast } from 'react-toastify'
 import axios from 'axios'
+import { log } from 'node:console'
 
 const BuyCredit = () => {
 
@@ -29,6 +30,21 @@ const BuyCredit = () => {
       handler: async (response) => {
         console.log(response);
         
+        const token = await getToken()
+
+        try {
+          
+          const { data } = await axios.post(backendUrl+'/api/user/verify-razor',response,{headers:{token}})
+          if (data.success) {
+            loadCreditsData()
+            navigate('/')
+            toast.success('Credit Added')
+          }
+        } catch (error) {
+          console.log(error);
+          toast.error(error.message)
+        }
+
       }
     }
 
@@ -37,22 +53,17 @@ const BuyCredit = () => {
 
   }
 
-  const paymentRazorpay = async (plan) => {
+  const paymentRazorpay = async (planId) => {
     try {
-      const token = await getToken()
-      const { data } = await axios.post(backendUrl + '/api/user/pay-razor', 
-        { planId: plan },
-        { headers: { token } }
-      )
       
+      const token = await getToken()
+      const { data } = await axios.post(backendUrl + '/api/user/pay-razor',{planId},{headers:{token}})
       if (data.success) {
         initPay(data.order)
-      } else {
-        toast.error(data.message)
       }
     } catch (error) {
-      console.error(error);
-      toast.error(error.message || 'Payment initialization failed')
+      console.log(error);
+      toast.error(error.message)
     }
   }
 
@@ -188,10 +199,8 @@ const BuyCredit = () => {
               </span>
               <span className='text-neutral-400'>/month</span>
             </div>
-            <button 
-              onClick={() => paymentRazorpay('Basic')} 
-              className='w-full py-2 px-4 rounded-lg bg-gradient-to-r from-purple-500 to-orange-400 text-white 
-                hover:from-orange-400 hover:to-purple-500 transition-all duration-300 mb-6'>
+            <button onClick={()=>paymentRazorpay(item.id)} className='w-full py-2 px-4 rounded-lg bg-gradient-to-r from-purple-500 to-orange-400 text-white 
+              hover:from-orange-400 hover:to-purple-500 transition-all duration-300 mb-6'>
               Choose Basic
             </button>
             <div className='space-y-3'>
@@ -225,10 +234,8 @@ const BuyCredit = () => {
               </span>
               <span className='text-neutral-400'>/month</span>
             </div>
-            <button 
-              onClick={() => paymentRazorpay('Advanced')} 
-              className='w-full py-2 px-4 rounded-lg bg-gradient-to-r from-purple-500 to-orange-400 text-white 
-                hover:from-orange-400 hover:to-purple-500 transition-all duration-300 mb-6'>
+            <button onClick={()=>paymentRazorpay(item.id)} className='w-full py-2 px-4 rounded-lg bg-gradient-to-r from-purple-500 to-orange-400 text-white 
+              hover:from-orange-400 hover:to-purple-500 transition-all duration-300 mb-6'>
               Choose Advanced
             </button>
             <div className='space-y-3'>
@@ -258,10 +265,8 @@ const BuyCredit = () => {
               </span>
               <span className='text-neutral-400'>/month</span>
             </div>
-            <button 
-              onClick={() => paymentRazorpay('Business')} 
-              className='w-full py-2 px-4 rounded-lg bg-gradient-to-r from-purple-500 to-orange-400 text-white 
-                hover:from-orange-400 hover:to-purple-500 transition-all duration-300 mb-6'>
+            <button onClick={()=>paymentRazorpay(item.id)} className='w-full py-2 px-4 rounded-lg bg-gradient-to-r from-purple-500 to-orange-400 text-white 
+              hover:from-orange-400 hover:to-purple-500 transition-all duration-300 mb-6'>
               Choose Business
             </button>
             <div className='space-y-3'>

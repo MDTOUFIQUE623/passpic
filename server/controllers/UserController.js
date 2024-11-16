@@ -130,39 +130,40 @@ const razorpayInstance = new razorpay({
 })
 
 // API to make payment for credits
-const paymentRazorpay = async (req, res) => {
+const paymentRazorpay = async (req,res) => {
     try {
+
         const { clerkId, planId } = req.body
 
         const userData = await userModel.findOne({ clerkId })
 
         if (!userData || !planId) {
-            return res.json({ success: false, message: 'Invalid Credentials' })
+            return res.json({ success:false,message:'Invalid Credentials'})
         }
 
-        let credits, plan, amount, date
+        let credits , plan , amount , date
 
-        switch (planId) {
+        switch (planId) { 
             case 'Basic':
                 plan = 'Basic'
                 credits = 100
-                amount = 1000 // Amount in paise (Rs. 10)
+                amount = 10
                 break;
 
-            case 'Advanced':
+                case 'Advanced':
                 plan = 'Advanced'
                 credits = 500
-                amount = 5000 // Amount in paise (Rs. 50)
+                amount = 50
                 break;
 
-            case 'Business':
+                case 'Business':
                 plan = 'Business'
                 credits = 5000
-                amount = 25000 // Amount in paise (Rs. 250)
+                amount = 250
                 break;
-
+        
             default:
-                return res.json({ success: false, message: 'Invalid plan selected' })
+                break;
         }
 
         date = Date.now()
@@ -171,7 +172,7 @@ const paymentRazorpay = async (req, res) => {
         const transactionData = {
             clerkId,
             plan,
-            amount: amount / 100, // Store actual amount in rupees
+            amount,
             credits,
             date
         }
@@ -179,25 +180,56 @@ const paymentRazorpay = async (req, res) => {
         const newTransaction = await transactionModel.create(transactionData)
 
         const options = {
-            amount: amount, // amount in paise
+            amount : amount * 100,
             currency: process.env.CURRENCY,
-            receipt: newTransaction._id.toString()
+            receipt: newTransaction._id
         }
 
-        const order = await razorpayInstance.orders.create(options)
-        
-        res.json({
-            success: true,
-            order,
-            amount,
-            currency: process.env.CURRENCY
+        await razorpayInstance.orders.create(options,(error,order)=>{
+            if (error) {
+                return res.json({success:false,message:error})
+            }
+            res.json({success:true,order})
         })
 
     } catch (error) {
-        console.error('Razorpay payment error:', error);
-        res.json({ success: false, message: error.message })
+       console.log(error.message);
+        res.json({ success: false, message: error.message})
+    }
+}
+
+// API Controller function to verify razorpay payment
+const verifyRazorpay = async (req, res) => {
+    try {
+        
+        const { razorpay_order_id } = req.body
+
+        const orderinfo = await razorpayInstance.orders.fetch(razorpay_order_id)
+
+        if (orderinfo.status = 'paid') {
+            
+            const transactionData = await transactionModel.findById(orderinfo.receipt)
+            if (transactionData.payment) {
+                return res.json({success:false,message: 'Payment Failed'})
+            }
+
+            // Adding Credits in user data
+            const userData = await userModel.findOne({clerkId:transactionData.clerkId})
+            const creditBalance = userData.creditBalance + transactionData.credits
+            await userModel.findByIdAndUpdate(userData._id,{creditBalance})
+
+            // making the payment true
+            await transactionModel.findByIdAndUpdate(transactionData._id,{payment:true})
+
+            res.json({ success:true, message: "Credits Added"})
+
+        }
+
+    } catch (error) {
+        console.log(error.message);
+        res.json({ success: false, message: error.message})
     }
 }
 
 
-export { clerkWebhooks, userCredits, paymentRazorpay }
+export { clerkWebhooks, userCredits, paymentRazorpay, verifyRazorpay }
