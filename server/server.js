@@ -10,9 +10,14 @@ import imageRouter from './routes/imageRoutes.js'
 const app = express()
 
 // Initialize Middleware
+app.use(cors({
+    origin: ['http://localhost:5173', 'https://passpic-omega.vercel.app'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'token', 'x-api-key']
+}));
+
 app.use(express.json({ limit: '10mb' }))
 app.use('/api/webhooks', express.raw({ type: 'application/json' }))
-app.use(cors())
 
 // Connect to MongoDB
 connectDB().catch(err => {
@@ -22,7 +27,7 @@ connectDB().catch(err => {
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-    console.error(err.stack);
+    console.error('Error:', err);
     res.status(500).json({ 
         success: false, 
         message: 'Something broke!',
@@ -34,7 +39,7 @@ app.use((err, req, res, next) => {
 app.get('/', (req, res) => res.send("API Working"))
 app.use('/api/user', userRouter)
 app.use('/api/webhooks', webhookRouter)
-app.use('/api/image',imageRouter)
+app.use('/api/image', imageRouter)
 
 // For local development
 if (process.env.NODE_ENV !== 'production') {
