@@ -143,44 +143,56 @@ const paymentRazorpay = async (req, res) => {
 
         let credits, plan, amount
 
+        // Prices in USD
         switch (planId) {
             case 'Basic':
                 plan = 'Basic'
                 credits = 100
-                amount = 10
+                amount = 10 // $10
                 break;
             case 'Advanced':
                 plan = 'Advanced'
                 credits = 500
-                amount = 50
+                amount = 50 // $50
                 break;
             case 'Business':
                 plan = 'Business'
                 credits = 5000
-                amount = 250
+                amount = 250 // $250
                 break;
             default:
                 return res.json({ success: false, message: 'Invalid plan selected' })
         }
 
+        // Convert USD to INR (1 USD = ~83 INR as of now)
+        // Razorpay expects amount in smallest currency unit (paise)
+        const inrAmount = Math.round(amount * 83 * 100)
+
         // Creating Transaction
         const transactionData = await transactionModel.create({
             clerkId,
             plan,
-            amount,
+            amount, // Store original USD amount
             credits,
             date: Date.now()
         })
 
         const options = {
-            amount: amount * 100, // Convert to paise
-            currency: process.env.CURRENCY,
+            amount: inrAmount, // amount in paise (INR)
+            currency: 'INR', // Razorpay primarily works with INR
             receipt: transactionData._id.toString()
         }
 
         // Create Razorpay order using Promise
         const order = await razorpayInstance.orders.create(options)
-        return res.json({ success: true, order })
+        
+        // Send both INR and USD amounts to frontend
+        return res.json({ 
+            success: true, 
+            order,
+            usdAmount: amount,
+            inrAmount: inrAmount/100 // Convert paise to rupees for display
+        })
 
     } catch (error) {
         console.error('Payment creation error:', error)

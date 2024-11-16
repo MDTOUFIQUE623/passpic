@@ -18,38 +18,46 @@ const BuyCredit = () => {
 
   const initPay = async (order) => {
     try {
+        console.log('Initializing Razorpay with order:', order);
+        
+        if (!window.Razorpay) {
+            toast.error('Razorpay SDK not loaded');
+            return;
+        }
+
         const options = {
-            key: import.meta.env.VITE_RAZORPAY_KEY_ID,
+            key: 'rzp_test_kqQnvJegPjUfsT',
             amount: order.amount,
-            currency: order.currency,
+            currency: order.currency || 'INR',
             name: 'Passpic Credits',
-            description: "Credits Purchase",
+            description: `Purchase credits for $${order.usdAmount}`,
             order_id: order.id,
             handler: async function (response) {
+                console.log('Payment success response:', response);
                 try {
-                    const token = await getToken()
+                    const token = await getToken();
                     const verifyData = {
                         razorpay_order_id: response.razorpay_order_id,
                         razorpay_payment_id: response.razorpay_payment_id,
                         razorpay_signature: response.razorpay_signature
-                    }
+                    };
 
                     const { data } = await axios.post(
                         `${backendUrl}/api/user/verify-razor`,
                         verifyData,
                         { headers: { token } }
-                    )
+                    );
 
                     if (data.success) {
-                        await loadCreditsData()
-                        navigate('/')
-                        toast.success('Credits added successfully!')
+                        await loadCreditsData();
+                        navigate('/');
+                        toast.success('Credits added successfully!');
                     } else {
-                        toast.error(data.message || 'Payment verification failed')
+                        toast.error(data.message || 'Payment verification failed');
                     }
                 } catch (error) {
-                    console.error('Payment verification error:', error)
-                    toast.error(error.message || 'Payment verification failed')
+                    console.error('Payment verification error:', error);
+                    toast.error(error.message || 'Payment verification failed');
                 }
             },
             prefill: {
@@ -58,35 +66,64 @@ const BuyCredit = () => {
             },
             theme: {
                 color: '#9333EA'
+            },
+            notes: {
+                usd_amount: order.usdAmount
             }
-        }
+        };
 
-        const rzp = new window.Razorpay(options)
+        console.log('Creating Razorpay instance with options:', options);
+        const rzp = new window.Razorpay(options);
+        
         rzp.on('payment.failed', function (response) {
-            console.error('Payment failed:', response.error)
-            toast.error('Payment failed. Please try again.')
-        })
+            console.error('Payment failed:', response.error);
+            toast.error('Payment failed. Please try again.');
+        });
 
-        rzp.open()
+        console.log('Opening Razorpay modal');
+        rzp.open();
     } catch (error) {
-        console.error('Payment initialization error:', error)
-        toast.error('Failed to initialize payment')
+        console.error('Razorpay initialization error:', error);
+        toast.error('Failed to initialize payment');
     }
   }
 
   const paymentRazorpay = async (planId) => {
     try {
-      
-      const token = await getToken()
-      const { data } = await axios.post(backendUrl + '/api/user/pay-razor',{planId},{headers:{token}})
-      if (data.success) {
-        initPay(data.order)
-      }
+        console.log('Initiating payment for plan:', planId);
+        const token = await getToken();
+        
+        if (!token) {
+            toast.error('Authentication required');
+            return;
+        }
+
+        const { data } = await axios.post(
+            `${backendUrl}/api/user/pay-razor`,
+            { planId },
+            { 
+                headers: { 
+                    token,
+                    'Content-Type': 'application/json'
+                } 
+            }
+        );
+
+        console.log('Payment response:', data);
+
+        if (data.success && data.order) {
+            initPay({
+                ...data.order,
+                usdAmount: data.usdAmount
+            });
+        } else {
+            toast.error(data.message || 'Failed to create payment order');
+        }
     } catch (error) {
-      console.log(error);
-      toast.error(error.message)
+        console.error('Payment error:', error);
+        toast.error(error.response?.data?.message || error.message || 'Payment initialization failed');
     }
-  }
+  };
 
   const features = {
     free: {
@@ -220,8 +257,10 @@ const BuyCredit = () => {
               </span>
               <span className='text-neutral-400'>/month</span>
             </div>
-            <button onClick={()=>paymentRazorpay(item.id)} className='w-full py-2 px-4 rounded-lg bg-gradient-to-r from-purple-500 to-orange-400 text-white 
-              hover:from-orange-400 hover:to-purple-500 transition-all duration-300 mb-6'>
+            <button 
+              onClick={() => paymentRazorpay('Basic')} 
+              className='w-full py-2 px-4 rounded-lg bg-gradient-to-r from-purple-500 to-orange-400 text-white 
+                hover:from-orange-400 hover:to-purple-500 transition-all duration-300 mb-6'>
               Choose Basic
             </button>
             <div className='space-y-3'>
@@ -255,8 +294,10 @@ const BuyCredit = () => {
               </span>
               <span className='text-neutral-400'>/month</span>
             </div>
-            <button onClick={()=>paymentRazorpay(item.id)} className='w-full py-2 px-4 rounded-lg bg-gradient-to-r from-purple-500 to-orange-400 text-white 
-              hover:from-orange-400 hover:to-purple-500 transition-all duration-300 mb-6'>
+            <button 
+              onClick={() => paymentRazorpay('Advanced')} 
+              className='w-full py-2 px-4 rounded-lg bg-gradient-to-r from-purple-500 to-orange-400 text-white 
+                hover:from-orange-400 hover:to-purple-500 transition-all duration-300 mb-6'>
               Choose Advanced
             </button>
             <div className='space-y-3'>
@@ -286,8 +327,10 @@ const BuyCredit = () => {
               </span>
               <span className='text-neutral-400'>/month</span>
             </div>
-            <button onClick={()=>paymentRazorpay(item.id)} className='w-full py-2 px-4 rounded-lg bg-gradient-to-r from-purple-500 to-orange-400 text-white 
-              hover:from-orange-400 hover:to-purple-500 transition-all duration-300 mb-6'>
+            <button 
+              onClick={() => paymentRazorpay('Business')} 
+              className='w-full py-2 px-4 rounded-lg bg-gradient-to-r from-purple-500 to-orange-400 text-white 
+                hover:from-orange-400 hover:to-purple-500 transition-all duration-300 mb-6'>
               Choose Business
             </button>
             <div className='space-y-3'>
