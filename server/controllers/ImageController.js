@@ -3,13 +3,15 @@ import FormData from "form-data";
 import userModel from "../models/userModel.js";
 import sharp from 'sharp';
 
-// Helper function to optimize image buffer
-const optimizeImageBuffer = async (buffer, mimetype) => {
+// Helper function to compress image buffer to target size
+const compressImageBuffer = async (buffer, targetSizeInMB = 4.9) => {
     try {
-        // Get image metadata
         const metadata = await sharp(buffer).metadata();
-        
-        // Calculate target dimensions while maintaining aspect ratio
+        let quality = 100;
+        let outputBuffer = buffer;
+        const targetSizeInBytes = targetSizeInMB * 1024 * 1024;
+
+        // First try: Optimize dimensions if needed
         const MAX_DIMENSION = 4000;
         let width = metadata.width;
         let height = metadata.height;
@@ -18,23 +20,32 @@ const optimizeImageBuffer = async (buffer, mimetype) => {
             const ratio = Math.min(MAX_DIMENSION / width, MAX_DIMENSION / height);
             width = Math.round(width * ratio);
             height = Math.round(height * ratio);
+            
+            outputBuffer = await sharp(buffer)
+                .resize(width, height, {
+                    fit: 'inside',
+                    withoutEnlargement: true
+                })
+                .jpeg({ quality: 100 })
+                .toBuffer();
         }
 
-        // Optimize image
-        const optimizedBuffer = await sharp(buffer)
-            .resize(width, height, {
-                fit: 'inside',
-                withoutEnlargement: true
-            })
-            .jpeg({
-                quality: 85,
-                progressive: true
-            })
-            .toBuffer();
-        
-        return optimizedBuffer;
+        // If still too large, gradually reduce quality until we meet target size
+        while (outputBuffer.length > targetSizeInBytes && quality > 10) {
+            quality -= 5;
+            outputBuffer = await sharp(buffer)
+                .resize(width, height, {
+                    fit: 'inside',
+                    withoutEnlargement: true
+                })
+                .jpeg({ quality })
+                .toBuffer();
+        }
+
+        console.log(`Compressed image to quality: ${quality}%, Size: ${(outputBuffer.length / 1024 / 1024).toFixed(2)}MB`);
+        return outputBuffer;
     } catch (error) {
-        console.error('Error optimizing image:', error);
+        console.error('Error compressing image:', error);
         throw error;
     }
 };
@@ -64,12 +75,20 @@ const removeBgImage = async (req, res) => {
             });
         }
 
-        // Optimize image buffer
-        const optimizedBuffer = await optimizeImageBuffer(req.file.buffer, req.file.mimetype);
+        // Process the image buffer
+        let processedBuffer = req.file.buffer;
+        const originalSize = processedBuffer.length / (1024 * 1024); // Size in MB
+
+        // If image is larger than 5MB, compress it
+        if (originalSize > 5) {
+            console.log(`Original image size: ${originalSize.toFixed(2)}MB, compressing...`);
+            processedBuffer = await compressImageBuffer(processedBuffer);
+            console.log(`Compressed image size: ${(processedBuffer.length / 1024 / 1024).toFixed(2)}MB`);
+        }
 
         // Create form data
         const formData = new FormData();
-        formData.append('image_file', optimizedBuffer, {
+        formData.append('image_file', processedBuffer, {
             filename: 'image.jpg',
             contentType: 'image/jpeg'
         });
@@ -119,7 +138,7 @@ const removeBgImage = async (req, res) => {
             success: true,
             resultImage,
             creditBalance: updatedUser.creditBalance,
-            message: 'Background Removed Successfully'
+            message: originalSize > 5 ? 'Image was compressed and background removed successfully' : 'Background removed successfully'
         });
 
     } catch (error) {
