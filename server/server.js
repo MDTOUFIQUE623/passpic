@@ -5,14 +5,30 @@ import connectDB from './configs/mongodb.js'
 import userRouter from './routes/userRoutes.js'
 import webhookRouter from './routes/webhookRoutes.js'
 import imageRouter from './routes/imageRoutes.js'
+import fs from 'fs'
+import path from 'path'
+import { fileURLToPath } from 'url'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+
+// Create uploads directory with proper permissions
+const uploadsDir = path.join(__dirname, 'uploads')
+if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true, mode: 0o777 })
+}
 
 // App Config
 const app = express()
 
 // Initialize Middleware
-app.use(express.json({ limit: '10mb' }))
+app.use(express.json({ limit: '50mb' }))
+app.use(express.urlencoded({ extended: true, limit: '50mb' }))
 app.use('/api/webhooks', express.raw({ type: 'application/json' }))
 app.use(cors())
+
+// Serve uploads directory statically
+app.use('/uploads', express.static(uploadsDir))
 
 // Connect to MongoDB
 connectDB().catch(err => {
@@ -22,6 +38,15 @@ connectDB().catch(err => {
 
 // Error handling middleware
 app.use((err, req, res, next) => {
+    if (err.name === 'MulterError') {
+        if (err.code === 'LIMIT_FILE_SIZE') {
+            return res.status(400).json({
+                success: false,
+                message: 'File size is too large. Maximum size is 50MB'
+            });
+        }
+    }
+    
     console.error(err.stack);
     res.status(500).json({ 
         success: false, 

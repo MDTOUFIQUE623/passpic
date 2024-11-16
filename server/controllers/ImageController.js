@@ -8,6 +8,18 @@ import path from 'path';
 
 const unlinkAsync = promisify(fs.unlink);
 
+// Helper function to safely delete file
+const safeDeleteFile = async (filePath) => {
+    try {
+        if (filePath && fs.existsSync(filePath)) {
+            await fs.promises.chmod(filePath, 0o666); // Ensure we have permission to delete
+            await fs.promises.unlink(filePath);
+        }
+    } catch (error) {
+        console.error('Error deleting file:', error);
+    }
+};
+
 // Helper function to optimize image
 const optimizeImage = async (inputPath) => {
     try {
@@ -40,7 +52,7 @@ const optimizeImage = async (inputPath) => {
             .toFile(outputPath);
 
         // Replace original with optimized version
-        await unlinkAsync(inputPath);
+        await safeDeleteFile(inputPath);
         await fs.promises.rename(outputPath, inputPath);
         
         return inputPath;
@@ -82,11 +94,15 @@ const removeBgImage = async (req, res) => {
         // Optimize image if needed
         imagePath = await optimizeImage(imagePath);
 
-        // Create form data
+        // Create form data with proper headers
         const formData = new FormData();
-        formData.append('image_file', fs.createReadStream(imagePath));
+        const imageStream = fs.createReadStream(imagePath);
+        formData.append('image_file', imageStream, {
+            filename: path.basename(imagePath),
+            contentType: req.file.mimetype
+        });
 
-        // Make API request with retries
+        // Make API request with retries and proper error handling
         let response = null;
         let attempts = 0;
         const maxAttempts = 3;
@@ -109,12 +125,14 @@ const removeBgImage = async (req, res) => {
                 );
             } catch (error) {
                 attempts++;
-                if (attempts === maxAttempts) throw error;
-                await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds before retry
+                if (attempts === maxAttempts) {
+                    throw new Error(error.response?.data?.toString() || error.message);
+                }
+                await new Promise(resolve => setTimeout(resolve, 2000));
             }
         }
 
-        // Process response
+        // Process response and clean up
         const base64Image = Buffer.from(response.data, 'binary').toString('base64');
         const resultImage = `data:image/png;base64,${base64Image}`;
 
@@ -125,10 +143,8 @@ const removeBgImage = async (req, res) => {
             { new: true }
         );
 
-        // Clean up
-        if (imagePath && fs.existsSync(imagePath)) {
-            await unlinkAsync(imagePath);
-        }
+        // Clean up the file
+        await safeDeleteFile(imagePath);
 
         return res.json({
             success: true,
@@ -141,13 +157,7 @@ const removeBgImage = async (req, res) => {
         console.error('Error processing image:', error);
 
         // Clean up on error
-        if (imagePath && fs.existsSync(imagePath)) {
-            try {
-                await unlinkAsync(imagePath);
-            } catch (unlinkError) {
-                console.error('Error deleting temporary file:', unlinkError);
-            }
-        }
+        await safeDeleteFile(imagePath);
 
         return res.json({
             success: false,
