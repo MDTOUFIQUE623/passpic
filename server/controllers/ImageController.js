@@ -20,38 +20,42 @@ const removeBgImage = async (req, res) => {
 
         const imagePath = req.file.path;
 
-        // Reading the image file
-        const imageFile = fs.createReadStream(imagePath)
+        // Convert image to base64
+        const imageBuffer = fs.readFileSync(imagePath);
+        const base64Image = imageBuffer.toString('base64');
 
-        const formdata = new FormData()
-        formdata.append('image_file', imageFile)
-
-        const { data } = await axios.post('https://clipdrop-api.co/remove-background/v1', formdata, {
-            headers: {
-                'x-api-key': process.env.CLIPDROP_API,
+        // Call PixelCut API
+        const { data } = await axios.post(
+            'https://api.developer.pixelcut.ai/v1/remove-background',
+            {
+                image_base64: base64Image,
+                format: 'png'
             },
-            responseType: 'arraybuffer'
-        })
-
-        const base64Image = Buffer.from(data, 'binary').toString('base64')
-        const resultImage = `data:${req.file.mimetype};base64,${base64Image}`
+            {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-API-KEY': 'sk_ed53e25114d842d7827b589cf8707bdf'
+                }
+            }
+        );
 
         // Update credit balance
         const updatedUser = await userModel.findByIdAndUpdate(
-            user._id, 
+            user._id,
             { $inc: { creditBalance: -1 } },
             { new: true }
-        )
+        );
 
         // Clean up the temporary file
-        fs.unlinkSync(imagePath)
+        fs.unlinkSync(imagePath);
 
         res.json({
             success: true,
-            resultImage,
+            resultImage: data.image_url, // PixelCut returns the processed image URL
             creditBalance: updatedUser.creditBalance,
             message: 'Background Removed'
-        })
+        });
 
     } catch (error) {
         console.error('Error processing image:', error);
