@@ -1,32 +1,13 @@
 import axios from "axios";
-import fs from 'fs';
 import FormData from "form-data";
 import userModel from "../models/userModel.js";
 import sharp from 'sharp';
-import { promisify } from 'util';
-import path from 'path';
 
-const unlinkAsync = promisify(fs.unlink);
-
-// Helper function to safely delete file
-const safeDeleteFile = async (filePath) => {
+// Helper function to optimize image buffer
+const optimizeImageBuffer = async (buffer, mimetype) => {
     try {
-        if (filePath && fs.existsSync(filePath)) {
-            await fs.promises.chmod(filePath, 0o666); // Ensure we have permission to delete
-            await fs.promises.unlink(filePath);
-        }
-    } catch (error) {
-        console.error('Error deleting file:', error);
-    }
-};
-
-// Helper function to optimize image
-const optimizeImage = async (inputPath) => {
-    try {
-        const outputPath = `${inputPath}_optimized.jpg`;
-        
         // Get image metadata
-        const metadata = await sharp(inputPath).metadata();
+        const metadata = await sharp(buffer).metadata();
         
         // Calculate target dimensions while maintaining aspect ratio
         const MAX_DIMENSION = 4000;
@@ -40,7 +21,7 @@ const optimizeImage = async (inputPath) => {
         }
 
         // Optimize image
-        await sharp(inputPath)
+        const optimizedBuffer = await sharp(buffer)
             .resize(width, height, {
                 fit: 'inside',
                 withoutEnlargement: true
@@ -49,13 +30,9 @@ const optimizeImage = async (inputPath) => {
                 quality: 85,
                 progressive: true
             })
-            .toFile(outputPath);
-
-        // Replace original with optimized version
-        await safeDeleteFile(inputPath);
-        await fs.promises.rename(outputPath, inputPath);
+            .toBuffer();
         
-        return inputPath;
+        return optimizedBuffer;
     } catch (error) {
         console.error('Error optimizing image:', error);
         throw error;
@@ -64,8 +41,6 @@ const optimizeImage = async (inputPath) => {
 
 // Controller function to remove bg from image
 const removeBgImage = async (req, res) => {
-    let imagePath = null;
-    
     try {
         const { clerkId } = req.body;
 
@@ -89,20 +64,17 @@ const removeBgImage = async (req, res) => {
             });
         }
 
-        imagePath = req.file.path;
+        // Optimize image buffer
+        const optimizedBuffer = await optimizeImageBuffer(req.file.buffer, req.file.mimetype);
 
-        // Optimize image if needed
-        imagePath = await optimizeImage(imagePath);
-
-        // Create form data with proper headers
+        // Create form data
         const formData = new FormData();
-        const imageStream = fs.createReadStream(imagePath);
-        formData.append('image_file', imageStream, {
-            filename: path.basename(imagePath),
-            contentType: req.file.mimetype
+        formData.append('image_file', optimizedBuffer, {
+            filename: 'image.jpg',
+            contentType: 'image/jpeg'
         });
 
-        // Make API request with retries and proper error handling
+        // Make API request with retries
         let response = null;
         let attempts = 0;
         const maxAttempts = 3;
@@ -132,7 +104,7 @@ const removeBgImage = async (req, res) => {
             }
         }
 
-        // Process response and clean up
+        // Process response
         const base64Image = Buffer.from(response.data, 'binary').toString('base64');
         const resultImage = `data:image/png;base64,${base64Image}`;
 
@@ -143,9 +115,6 @@ const removeBgImage = async (req, res) => {
             { new: true }
         );
 
-        // Clean up the file
-        await safeDeleteFile(imagePath);
-
         return res.json({
             success: true,
             resultImage,
@@ -155,10 +124,6 @@ const removeBgImage = async (req, res) => {
 
     } catch (error) {
         console.error('Error processing image:', error);
-
-        // Clean up on error
-        await safeDeleteFile(imagePath);
-
         return res.json({
             success: false,
             message: error.response?.data?.message || error.message || 'Failed to process image',

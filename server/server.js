@@ -21,7 +21,7 @@ if (!fs.existsSync(uploadsDir)) {
 // App Config
 const app = express()
 
-// Initialize Middleware
+// Initialize Middleware with increased limits
 app.use(express.json({ limit: '50mb' }))
 app.use(express.urlencoded({ extended: true, limit: '50mb' }))
 app.use('/api/webhooks', express.raw({ type: 'application/json' }))
