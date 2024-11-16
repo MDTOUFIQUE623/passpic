@@ -21,27 +21,19 @@ const Header = () => {
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
-        // Basic validation
-        if (!file.type.startsWith('image/')) {
-            toast.error('Please upload an image file (JPG, PNG, or GIF)');
-            return;
-        }
+      // Basic validation
+      if (!file.type.startsWith('image/')) {
+        toast.error('Please upload an image file');
+        return;
+      }
 
-        // Check file size (15MB)
-        const maxSize = 15 * 1024 * 1024;
-        if (file.size > maxSize) {
-            toast.error('Image size should be less than 15MB');
-            return;
-        }
+      const maxSize = 5 * 1024 * 1024; // 5MB
+      if (file.size > maxSize) {
+        toast.error('Image size should be less than 5MB');
+        return;
+      }
 
-        // Check image type
-        const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/jpg'];
-        if (!validTypes.includes(file.type)) {
-            toast.error('Please upload a valid image file (JPG, PNG, or GIF)');
-            return;
-        }
-
-        processImage(file);
+      processImage(file);
     }
   };
 
