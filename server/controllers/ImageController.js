@@ -3,37 +3,39 @@ import FormData from "form-data";
 import userModel from "../models/userModel.js";
 import sharp from 'sharp';
 
-// Helper function to compress image buffer to target size
-const compressImageBuffer = async (buffer) => {
+// Separate function to compress image to optimal size
+const compressImage = async (buffer) => {
     try {
         const metadata = await sharp(buffer).metadata();
-        let quality = 100;
-        let outputBuffer = buffer;
-        const targetSizeInBytes = 4.5 * 1024 * 1024; // Target 4.5MB to be safe
-
-        // First try: Optimize dimensions if needed
-        const MAX_DIMENSION = 3000; // Reduced from 4000 to help with file size
+        
+        // Target a smaller size for all images (3MB)
+        const targetSizeInBytes = 3 * 1024 * 1024;
+        
+        // Initial dimensions
         let width = metadata.width;
         let height = metadata.height;
         
+        // If dimensions are too large, reduce them
+        const MAX_DIMENSION = 2000;
         if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
             const ratio = Math.min(MAX_DIMENSION / width, MAX_DIMENSION / height);
             width = Math.round(width * ratio);
             height = Math.round(height * ratio);
         }
 
-        // Initial compression with dimensions
-        outputBuffer = await sharp(buffer)
+        // First attempt: high quality compression
+        let outputBuffer = await sharp(buffer)
             .resize(width, height, {
                 fit: 'inside',
                 withoutEnlargement: true
             })
-            .jpeg({ quality: 100 })
+            .jpeg({ quality: 80 })
             .toBuffer();
 
-        // If still too large, gradually reduce quality
+        // If still too large, reduce quality gradually
+        let quality = 80;
         while (outputBuffer.length > targetSizeInBytes && quality > 30) {
-            quality -= 10;
+            quality -= 5;
             outputBuffer = await sharp(buffer)
                 .resize(width, height, {
                     fit: 'inside',
@@ -43,7 +45,7 @@ const compressImageBuffer = async (buffer) => {
                 .toBuffer();
         }
 
-        // If still too large after quality reduction, reduce dimensions further
+        // If still too large, reduce dimensions
         if (outputBuffer.length > targetSizeInBytes) {
             const scaleFactor = Math.sqrt(targetSizeInBytes / outputBuffer.length);
             width = Math.round(width * scaleFactor);
@@ -54,15 +56,19 @@ const compressImageBuffer = async (buffer) => {
                     fit: 'inside',
                     withoutEnlargement: true
                 })
-                .jpeg({ quality: Math.max(quality, 60) }) // Don't go below 60% quality
+                .jpeg({ 
+                    quality: Math.max(quality, 50),
+                    progressive: true,
+                    optimizeScans: true
+                })
                 .toBuffer();
         }
 
-        console.log(`Compressed image - Quality: ${quality}%, Size: ${(outputBuffer.length / 1024 / 1024).toFixed(2)}MB, Dimensions: ${width}x${height}`);
+        console.log(`Compressed image - Size: ${(outputBuffer.length / 1024 / 1024).toFixed(2)}MB, Quality: ${quality}%, Dimensions: ${width}x${height}`);
         return outputBuffer;
     } catch (error) {
-        console.error('Error compressing image:', error);
-        throw error;
+        console.error('Error in compressImage:', error);
+        throw new Error('Failed to compress image');
     }
 };
 
@@ -91,24 +97,19 @@ const removeBgImage = async (req, res) => {
             });
         }
 
-        // Always compress the image to ensure it's under 5MB
+        // Step 1: Compress the image first
         console.log(`Original image size: ${(req.file.buffer.length / 1024 / 1024).toFixed(2)}MB`);
-        const processedBuffer = await compressImageBuffer(req.file.buffer);
-        console.log(`Final compressed size: ${(processedBuffer.length / 1024 / 1024).toFixed(2)}MB`);
+        const compressedBuffer = await compressImage(req.file.buffer);
+        console.log(`Compressed image size: ${(compressedBuffer.length / 1024 / 1024).toFixed(2)}MB`);
 
-        // Verify the size is under 5MB
-        if (processedBuffer.length > 5 * 1024 * 1024) {
-            throw new Error('Failed to compress image to required size');
-        }
-
-        // Create form data
+        // Step 2: Create form data with compressed image
         const formData = new FormData();
-        formData.append('image_file', processedBuffer, {
+        formData.append('image_file', compressedBuffer, {
             filename: 'image.jpg',
             contentType: 'image/jpeg'
         });
 
-        // Make API request with retries
+        // Step 3: Make API request with retries
         let response = null;
         let attempts = 0;
         const maxAttempts = 3;
@@ -133,17 +134,17 @@ const removeBgImage = async (req, res) => {
                 attempts++;
                 console.error(`Attempt ${attempts} failed:`, error.message);
                 if (attempts === maxAttempts) {
-                    throw new Error(error.response?.data?.toString() || error.message);
+                    throw new Error('Failed to remove background after multiple attempts');
                 }
                 await new Promise(resolve => setTimeout(resolve, 2000));
             }
         }
 
-        // Process response
+        // Step 4: Process response
         const base64Image = Buffer.from(response.data, 'binary').toString('base64');
         const resultImage = `data:image/png;base64,${base64Image}`;
 
-        // Update credit balance
+        // Step 5: Update credit balance
         const updatedUser = await userModel.findByIdAndUpdate(
             user._id,
             { $inc: { creditBalance: -1 } },
