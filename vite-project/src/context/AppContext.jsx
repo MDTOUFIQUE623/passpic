@@ -105,20 +105,26 @@ const AppContextProvider = (props) => {
 
             try {
                 console.log('Making request to:', `${backendUrl}/api/image/remove-bg`);
-                const { data } = await axios({
-                    method: 'post',
-                    url: `${backendUrl}/api/image/remove-bg`,
-                    data: formData,
-                    headers: { 
-                        'token': token,
-                        'Content-Type': 'multipart/form-data'
-                    },
-                    timeout: 120000,
-                    maxContentLength: Infinity,
-                    maxBodyLength: Infinity,
-                    withCredentials: true
-                });
+                
+                // Create headers object
+                const headers = {
+                    'token': token,
+                    'Content-Type': 'multipart/form-data'
+                };
 
+                // Make the request
+                const response = await axios.post(
+                    `${backendUrl}/api/image/remove-bg`,
+                    formData,
+                    {
+                        headers: headers,
+                        timeout: 180000, // 3 minute timeout
+                        maxContentLength: Infinity,
+                        maxBodyLength: Infinity
+                    }
+                );
+
+                const data = response.data;
                 console.log('Response received:', data);
 
                 if (!data.success) {
@@ -128,14 +134,21 @@ const AppContextProvider = (props) => {
                 setResultImage(data.resultImage);
                 data.creditBalance && setCredit(data.creditBalance);
                 toast.success('Background removed successfully!');
+                
             } catch (error) {
                 console.error('API Error:', error);
+                
+                // Log detailed error information
                 if (error.response) {
-                    console.error('Error response:', error.response.data);
-                    throw new Error(error.response.data.message || 'Server error');
+                    console.error('Error response:', {
+                        status: error.response.status,
+                        data: error.response.data,
+                        headers: error.response.headers
+                    });
+                    throw new Error(error.response.data?.message || `Server error: ${error.response.status}`);
                 } else if (error.request) {
-                    console.error('No response received');
-                    throw new Error('Network error. Please check your connection and try again.');
+                    console.error('No response received:', error.request);
+                    throw new Error('Network error. The server is not responding. Please try again later.');
                 } else {
                     console.error('Error setting up request:', error.message);
                     throw error;

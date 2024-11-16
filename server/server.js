@@ -9,41 +9,34 @@ import imageRouter from './routes/imageRoutes.js'
 // App Config
 const app = express()
 
-// Configure CORS with specific origins
-const corsOptions = {
-    origin: [
+// Configure CORS
+app.use((req, res, next) => {
+    const allowedOrigins = [
         'http://localhost:5173',
         'https://passpic-omega.vercel.app',
         'https://passpic.vercel.app'
-    ],
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'token', 'x-api-key'],
-    exposedHeaders: ['Content-Range', 'X-Content-Range'],
-    credentials: true,
-    preflightContinue: false,
-    optionsSuccessStatus: 204
-};
+    ];
+    
+    const origin = req.headers.origin;
+    if (allowedOrigins.includes(origin)) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+    }
+    
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, token, x-api-key');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    
+    if (req.method === 'OPTIONS') {
+        return res.status(200).end();
+    }
+    
+    next();
+});
 
 // Initialize Middleware with increased limits
-app.use(cors(corsOptions));
-
-// Add OPTIONS handling for preflight requests
-app.options('*', cors(corsOptions));
-
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use('/api/webhooks', express.raw({ type: 'application/json' }));
-
-// Add response headers middleware
-app.use((req, res, next) => {
-    res.header('Access-Control-Allow-Origin', req.headers.origin);
-    res.header('Access-Control-Allow-Credentials', true);
-    res.header(
-        'Access-Control-Allow-Headers',
-        'Origin, X-Requested-With, Content-Type, Accept, Authorization, token, x-api-key'
-    );
-    next();
-});
 
 // Health check endpoint
 app.get('/health', (req, res) => {
