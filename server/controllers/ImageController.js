@@ -3,48 +3,29 @@ import fs from 'fs'
 import FormData from "form-data";
 import userModel from "../models/userModel.js";
 
-// Controller function to remove bg from image
 const removeBgImage = async (req, res) => {
-    let imagePath = null;
-    
     try {
-        // Validate request
-        if (!req.file) {
-            throw new Error('No image file uploaded');
-        }
-
         const { clerkId } = req.body;
-        if (!clerkId) {
-            throw new Error('User ID is required');
-        }
-
-        // Log request details
-        console.log('Processing request:', {
-            fileSize: req.file.size,
-            fileType: req.file.mimetype,
-            clerkId: clerkId
-        });
-
-        // Find user and check credits
         const user = await userModel.findOne({ clerkId });
+
         if (!user) {
-            throw new Error('User not found');
+            return res.json({ success: false, message: "User Not Found" });
         }
 
-        if (user.creditBalance <= 0) {
-            throw new Error('Insufficient credits');
+        if (user.creditBalance === 0) {
+            return res.json({ success: false, message: "No Credit Balance", creditBalance: user.creditBalance });
         }
 
-        imagePath = req.file.path;
+        if (!req.file) {
+            return res.json({ success: false, message: "No image file provided" });
+        }
+
+        const imagePath = req.file.path;
         const imageFile = fs.createReadStream(imagePath);
 
-        // Prepare form data for ClipDrop API
         const formdata = new FormData();
         formdata.append('image_file', imageFile);
 
-        console.log('Sending request to ClipDrop API');
-        
-        // Make request to ClipDrop API
         const { data } = await axios.post(
             'https://clipdrop-api.co/remove-background/v1',
             formdata,
@@ -52,55 +33,44 @@ const removeBgImage = async (req, res) => {
                 headers: {
                     'x-api-key': process.env.CLIPDROP_API,
                 },
-                responseType: 'arraybuffer',
-                maxContentLength: Infinity,
-                maxBodyLength: Infinity
+                responseType: 'arraybuffer'
             }
         );
 
-        if (!data) {
-            throw new Error('No response from background removal service');
-        }
-
-        // Convert response to base64
         const base64Image = Buffer.from(data, 'binary').toString('base64');
         const resultImage = `data:${req.file.mimetype};base64,${base64Image}`;
 
-        // Update user credits
         const updatedUser = await userModel.findByIdAndUpdate(
-            user._id,
+            user._id, 
             { $inc: { creditBalance: -1 } },
             { new: true }
         );
 
-        console.log('Background removal successful');
+        fs.unlinkSync(imagePath);
 
         res.json({
             success: true,
             resultImage,
             creditBalance: updatedUser.creditBalance,
-            message: 'Background removed successfully'
+            message: 'Background Removed'
         });
 
     } catch (error) {
-        console.error('Error in removeBgImage:', error);
+        console.error('Error processing image:', error);
         
-        res.status(error.response?.status || 500).json({
-            success: false,
-            message: error.message || 'Failed to process image',
-            details: process.env.NODE_ENV === 'development' ? error.stack : undefined
-        });
-        
-    } finally {
-        // Clean up temporary file
-        if (imagePath) {
+        if (req.file && req.file.path) {
             try {
-                fs.unlinkSync(imagePath);
+                fs.unlinkSync(req.file.path);
             } catch (unlinkError) {
                 console.error('Error deleting temporary file:', unlinkError);
             }
         }
+
+        res.json({ 
+            success: false, 
+            message: error.message || 'Failed to process image'
+        });
     }
 };
 
-export { removeBgImage }
+export { removeBgImage };

@@ -98,49 +98,33 @@ const AppContextProvider = (props) => {
             setProcessingStep('Removing background...');
             const token = await getToken();
             
-            // Configure axios defaults
-            axios.defaults.withCredentials = true;
+            console.log('Making request to:', `${backendUrl}/api/image/remove-bg`);
             
-            const response = await axios({
-                method: 'post',
-                url: `${backendUrl}/api/image/remove-bg`,
-                data: formData,
-                headers: { 
-                    'token': token,
-                    'Content-Type': 'multipart/form-data',
-                    'Access-Control-Allow-Origin': '*'
-                },
-                withCredentials: true,
-                maxContentLength: Infinity,
-                maxBodyLength: Infinity
-            });
+            const response = await axios.post(
+                `${backendUrl}/api/image/remove-bg`,
+                formData,
+                {
+                    headers: { 
+                        'token': token,
+                        'Content-Type': 'multipart/form-data'
+                    }
+                }
+            );
 
-            console.log('Response:', response.data);
+            const { data } = response;
+            console.log('Response:', data);
 
-            if (!response.data.success) {
-                throw new Error(response.data.message || 'Failed to process image');
+            if (!data.success) {
+                throw new Error(data.message || 'Failed to process image');
             }
 
-            setResultImage(response.data.resultImage);
-            if (response.data.creditBalance) {
-                setCredit(response.data.creditBalance);
-            }
+            setResultImage(data.resultImage);
+            data.creditBalance && setCredit(data.creditBalance);
             toast.success('Background removed successfully!');
             
         } catch (error) {
-            console.error('Error details:', {
-                message: error.message,
-                response: error.response?.data,
-                status: error.response?.status
-            });
-            
-            if (error.response) {
-                toast.error(error.response.data.message || 'Server error');
-            } else if (error.request) {
-                toast.error('Network error. Please check your connection and try again.');
-            } else {
-                toast.error(error.message || 'Failed to process image');
-            }
+            console.error('Error processing image:', error);
+            toast.error(error.message || 'Failed to process image');
             
             if (error.message?.includes('credit') && credit === 0) {
                 navigate('/buy');

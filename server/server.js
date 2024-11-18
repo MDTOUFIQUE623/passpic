@@ -10,44 +10,15 @@ import imageRouter from './routes/imageRoutes.js'
 const app = express()
 
 // Initialize Middleware
-const corsOptions = {
-    origin: ['http://localhost:5173', 'https://passpic-omega.vercel.app', 'https://passpic-omega.vercel.app/result'],
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'token', 'x-api-key', 'Access-Control-Allow-Origin'],
-    exposedHeaders: ['Access-Control-Allow-Origin'],
-    credentials: true
-};
+app.use(cors());
 
-app.use(cors(corsOptions));
-
-app.options('*', cors(corsOptions));
-
-app.use((req, res, next) => {
-    res.header('Access-Control-Allow-Origin', req.headers.origin);
-    res.header('Access-Control-Allow-Credentials', true);
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, token, x-api-key');
-    next();
-});
-
-app.use(express.json({ limit: '50mb' }))
-app.use(express.urlencoded({ extended: true, limit: '50mb' }))
+app.use(express.json({ limit: '10mb' }))
 app.use('/api/webhooks', express.raw({ type: 'application/json' }))
 
 // Connect to MongoDB
 connectDB().catch(err => {
     console.error("Failed to connect to MongoDB:", err);
     process.exit(1);
-});
-
-// Error handling middleware
-app.use((err, req, res, next) => {
-    console.error('Error:', err);
-    res.status(500).json({ 
-        success: false, 
-        message: 'Something broke!',
-        error: process.env.NODE_ENV === 'development' ? err.message : 'Internal Server Error'
-    });
 });
 
 // API routes
