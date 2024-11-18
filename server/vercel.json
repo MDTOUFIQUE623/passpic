@@ -6,6 +6,7 @@
             "use": "@vercel/node",
             "config": {
                 "maxDuration": 60,
+                "includeFiles": ["uploads/**", "models/**"],
                 "memory": 3008
             }
         }
@@ -13,11 +14,17 @@
     "routes": [
         {
             "src": "/api/(.*)",
-            "dest": "server.js"
+            "dest": "/server.js",
+            "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+            "headers": {
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Headers": "Origin, X-Requested-With, Content-Type, Accept, token, x-api-key",
+                "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS"
+            }
         },
         {
             "src": "/(.*)",
-            "dest": "server.js"
+            "dest": "/server.js"
         }
     ],
     "env": {

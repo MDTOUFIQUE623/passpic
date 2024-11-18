@@ -1,7 +1,6 @@
 import 'dotenv/config'
 import express from 'express'
 import cors from 'cors'
-import fs from 'fs'
 import connectDB from './configs/mongodb.js'
 import userRouter from './routes/userRoutes.js'
 import webhookRouter from './routes/webhookRoutes.js'
@@ -28,20 +27,50 @@ app.use(express.urlencoded({ limit: '30mb', extended: true }));
 // Special handling for webhook routes
 app.use('/api/webhooks', express.raw({ type: 'application/json' }));
 
-// Initialize MongoDB connection immediately
-console.log('Initializing server...');
-connectDB().then(() => {
-    console.log('Initial database connection established');
-}).catch(err => {
-    console.error('Failed to establish initial database connection:', err);
-    process.exit(1);
+// Database connection state
+let isConnected = false;
+
+// Connect to MongoDB (with connection reuse for serverless)
+const connectToDb = async () => {
+    if (isConnected) {
+        console.log('Using existing database connection');
+        return;
+    }
+
+    try {
+        await connectDB();
+        isConnected = true;
+        console.log('Database connection established');
+    } catch (error) {
+        console.error('Database connection error:', error);
+        throw error;
+    }
+};
+
+// Middleware to ensure DB connection
+app.use(async (req, res, next) => {
+    try {
+        await connectToDb();
+        next();
+    } catch (error) {
+        console.error('Database connection middleware error:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Database connection failed' 
+        });
+    }
+});
+
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+    res.status(200).json({ 
+        status: 'ok', 
+        environment: process.env.NODE_ENV,
+        dbConnected: isConnected
+    });
 });
 
 // Routes
-app.get('/api/health', (req, res) => {
-    res.status(200).json({ status: 'ok', environment: process.env.NODE_ENV });
-});
-
 app.use('/api/user', userRouter);
 app.use('/api/webhooks', webhookRouter);
 app.use('/api/image', imageRouter);
