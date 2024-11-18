@@ -130,25 +130,25 @@ const BuyCredit = () => {
       credits: '10 Credits',
       quality: 'Standard Quality',
       speed: 'Normal Processing',
-      size: '5MB Upload Limit'
+      size: '30MB Upload Limit'
     },
     basic: {
       credits: '100 Credits',
       quality: 'High Quality',
       speed: 'Fast Processing',
-      size: '10MB Upload Limit'
+      size: '30MB Upload Limit'
     },
     advanced: {
       credits: '500 Credits',
       quality: 'Premium Quality',
       speed: 'Priority Processing',
-      size: '15MB Upload Limit'
+      size: '30MB Upload Limit'
     },
     business: {
       credits: '5000 Credits',
       quality: 'Enterprise Quality',
       speed: 'Instant Processing',
-      size: '25MB Upload Limit'
+      size: '30MB Upload Limit'
     }
   }
 

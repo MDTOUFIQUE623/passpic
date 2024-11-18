@@ -1,26 +1,37 @@
 import React, { useContext } from 'react'
-import { assets } from '../assets/assets'
 import { AppContext } from '../context/AppContext'
 import { toast } from 'react-toastify'
+import upload_btn_icon from '../assets/upload_btn_icon.svg'
 
 const Upload = () => {
   const { processImage } = useContext(AppContext)
 
-  const handleImageUpload = (e) => {
+  const handleImageUpload = async (e) => {
     const file = e.target.files[0];
-    if (file) {
-      if (!file.type.startsWith('image/')) {
-        toast.error('Please upload an image file');
+    if (!file) return;
+
+    try {
+      // Check if it's an image file
+      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+      if (!allowedTypes.includes(file.type.toLowerCase())) {
+        toast.error('Please upload a JPG, PNG, or WEBP image');
+        e.target.value = '';
         return;
       }
 
-      const maxSize = 5 * 1024 * 1024; // 5MB
+      // Check file size (30MB limit for ClipDrop API)
+      const maxSize = 30 * 1024 * 1024;
       if (file.size > maxSize) {
-        toast.error('Image size should be less than 5MB');
+        toast.error('Image size should be less than 30MB');
+        e.target.value = '';
         return;
       }
 
-      processImage(file);
+      await processImage(file);
+    } catch (error) {
+      console.error('Error handling image upload:', error);
+      toast.error('Failed to process image. Please try again');
+      e.target.value = '';
     }
   };
 
@@ -36,7 +47,7 @@ const Upload = () => {
         <input 
           onChange={handleImageUpload} 
           type="file" 
-          accept='image/*' 
+          accept="image/jpeg,image/jpg,image/png,image/webp"
           id="upload2" 
           hidden
         />
@@ -50,12 +61,15 @@ const Upload = () => {
         >
           <img 
             width={15} 
-            src={assets.upload_btn_icon} 
-            alt="" 
+            src={upload_btn_icon} 
+            alt="Upload" 
             className='transition-transform duration-300 group-hover:rotate-12'
           />
           <p className='text-white text-sm'>Upload Your Photo</p>
         </label>
+        <div className='mt-4 text-neutral-400 text-sm'>
+          Supported formats: JPG, PNG, WEBP (max 25MB)
+        </div>
       </div>
     </div>
   )

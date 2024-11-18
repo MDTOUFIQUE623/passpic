@@ -11,12 +11,6 @@ const authUser = async (req, res, next) => {
             });
         }
 
-        // Log token details (without exposing sensitive data)
-        console.log('Token received:', {
-            length: token.length,
-            type: typeof token
-        });
-
         const decoded = jwt.decode(token);
         
         if (!decoded || !decoded.sub) {
@@ -26,7 +20,21 @@ const authUser = async (req, res, next) => {
             });
         }
 
-        req.body.clerkId = decoded.sub;
+        const clerkId = req.body.clerkId || decoded.sub;
+        
+        if (req.body instanceof Object) {
+            req.body.clerkId = clerkId;
+        }
+
+        console.log('Auth middleware:', {
+            tokenPresent: !!token,
+            decodedPresent: !!decoded,
+            clerkId: clerkId,
+            bodyType: typeof req.body,
+            method: req.method,
+            contentType: req.headers['content-type']
+        });
+
         next();
 
     } catch (error) {

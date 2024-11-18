@@ -4,13 +4,14 @@ import axios from 'axios'
 import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
 import { loadFaceDetectionModel, createPassportPhoto } from '../utils/faceDetection';
+import { compressImage, needsCompression } from '../utils/imageCompression';
 
 export const AppContext = createContext()
 
 const AppContextProvider = (props) => {
     const [credit, setCredit] = useState(null);
     const { getToken, isSignedIn } = useAuth();
-
+    const { user } = useUser();
     const [image, setImage] = useState(false)
     const [resultImage, setResultImage] = useState(false)
     const [isProcessing, setIsProcessing] = useState(false);
@@ -20,7 +21,6 @@ const AppContextProvider = (props) => {
     const navigate = useNavigate()
     const { openSignIn } = useClerk()
 
-    // Add model loading state
     const [isModelLoaded, setIsModelLoaded] = useState(false);
     const [isConverting, setIsConverting] = useState(false);
     const [passportImage, setPassportImage] = useState(null);
@@ -28,50 +28,48 @@ const AppContextProvider = (props) => {
     // Load face detection model on mount
     useEffect(() => {
         const loadModel = async () => {
+            if (isModelLoaded) return;
             try {
                 await loadFaceDetectionModel();
                 setIsModelLoaded(true);
                 console.log('Face detection model loaded successfully');
             } catch (error) {
                 console.error('Error loading face detection model:', error);
-                toast.error('Failed to load face detection model');
+                toast.error('Failed to load face detection model. Please refresh the page.');
             }
         };
         loadModel();
     }, []);
 
     const loadCreditsData = async () => {
+        if (!isSignedIn) {
+            setCredit(null);
+            return;
+        }
+        
         try {
-            if (!isSignedIn) return;
-            
             const token = await getToken();
+            if (!token) throw new Error('Authentication token not available');
             
-            // Configure axios defaults
-            axios.defaults.withCredentials = true;
-            
-            const response = await axios({
-                method: 'get',
-                url: `${backendUrl}/api/user/credits`,
+            const response = await axios.get(`${backendUrl}/api/user/credits`, {
                 headers: { 
                     token,
-                    'Content-Type': 'application/json',
-                    'Access-Control-Allow-Origin': '*'
-                },
-                withCredentials: true
+                    'Content-Type': 'application/json'
+                }
             });
 
             if (response.data.success) {
                 setCredit(response.data.credits);
             } else {
-                throw new Error(response.data.message);
+                throw new Error(response.data.message || 'Failed to load credits');
             }
         } catch (error) {
             console.error("Error loading credits:", error);
-            toast.error(error.message || "Failed to load credits");
+            toast.error(error.message || "Failed to load credits. Please try again.");
+            setCredit(null);
         }
     };
 
-    // Load credits when user signs in
     useEffect(() => {
         if (isSignedIn) {
             loadCreditsData();
@@ -81,54 +79,125 @@ const AppContextProvider = (props) => {
     }, [isSignedIn]);
 
     const processImage = async (image) => {
-        try {
-            if (!isSignedIn) {
-                return openSignIn();
-            }
+        if (!isSignedIn) {
+            openSignIn();
+            return;
+        }
 
+        if (!image) {
+            toast.error('No image selected');
+            return;
+        }
+
+        try {
             setIsProcessing(true);
             setImage(image);
             setResultImage(false);
             navigate('/result');
 
             setProcessingStep('Preparing image...');
+
+            // Add validation for image type
+            const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+            if (!validTypes.includes(image.type.toLowerCase())) {
+                throw new Error('Invalid image format. Please use JPG, PNG, or WEBP');
+            }
+
+            // Check if image needs compression
+            let processedImage = image;
+            if (await needsCompression(image)) {
+                setProcessingStep('Optimizing image size...');
+                try {
+                    processedImage = await compressImage(image);
+                    console.log('Image compression successful:', {
+                        originalSize: `${(image.size / (1024 * 1024)).toFixed(2)}MB`,
+                        compressedSize: `${(processedImage.size / (1024 * 1024)).toFixed(2)}MB`,
+                        compressionRatio: `${((1 - processedImage.size / image.size) * 100).toFixed(1)}%`
+                    });
+                } catch (compressionError) {
+                    console.error('Image compression failed:', compressionError);
+                    // Continue with original image if compression fails
+                    processedImage = image;
+                }
+            }
+
             const formData = new FormData();
-            formData.append('image', image);
+            formData.append('image', processedImage);
+            formData.append('clerkId', user.id);
+
+            const token = await getToken();
+            if (!token) throw new Error('Authentication token not available');
 
             setProcessingStep('Removing background...');
-            const token = await getToken();
             
-            console.log('Making request to:', `${backendUrl}/api/image/remove-bg`);
-            
-            const response = await axios.post(
-                `${backendUrl}/api/image/remove-bg`,
-                formData,
-                {
-                    headers: { 
-                        'token': token,
-                        'Content-Type': 'multipart/form-data'
-                    }
+            console.log('Sending request to server...', {
+                imageSize: `${(processedImage.size / (1024 * 1024)).toFixed(2)}MB`,
+                imageType: processedImage.type,
+                fileName: processedImage.name
+            });
+
+            const response = await axios({
+                method: 'post',
+                url: `${backendUrl}/api/image/remove-bg`,
+                data: formData,
+                headers: { 
+                    'token': token,
+                    'Content-Type': 'multipart/form-data'
+                },
+                maxContentLength: 31457280, // 30MB
+                maxBodyLength: 31457280,
+                timeout: 60000, // 60 second timeout
+                onUploadProgress: (progressEvent) => {
+                    const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+                    setProcessingStep(`Uploading image... ${progress}%`);
                 }
-            );
+            });
 
             const { data } = response;
-            console.log('Response:', data);
 
             if (!data.success) {
                 throw new Error(data.message || 'Failed to process image');
             }
 
             setResultImage(data.resultImage);
-            data.creditBalance && setCredit(data.creditBalance);
-            toast.success('Background removed successfully!');
+            if (data.creditBalance !== undefined) {
+                setCredit(data.creditBalance);
+            }
+            toast.success(data.message || 'Background removed successfully!');
             
         } catch (error) {
-            console.error('Error processing image:', error);
-            toast.error(error.message || 'Failed to process image');
+            console.error('Error processing image:', {
+                message: error.message,
+                response: error.response?.data,
+                status: error.response?.status,
+                type: error.type
+            });
+
+            let errorMessage = 'Failed to process image';
+
+            if (error.response?.data?.message) {
+                errorMessage = error.response.data.message;
+            } else if (error.message) {
+                errorMessage = error.message;
+            }
+
+            // Handle specific error cases
+            if (error.code === 'ECONNABORTED') {
+                errorMessage = 'Request timed out. Please try again.';
+            } else if (error.response?.status === 413) {
+                errorMessage = 'Image size too large. Please try a smaller image.';
+            } else if (error.response?.status === 429) {
+                errorMessage = 'Too many requests. Please wait a moment and try again.';
+            }
+
+            toast.error(errorMessage);
             
-            if (error.message?.includes('credit') && credit === 0) {
+            if (errorMessage.includes('credit') && credit === 0) {
                 navigate('/buy');
             }
+
+            // Reset states on error
+            setResultImage(false);
         } finally {
             setIsProcessing(false);
             setProcessingStep('');
@@ -142,7 +211,7 @@ const AppContextProvider = (props) => {
         }
 
         if (!isModelLoaded) {
-            toast.error('Face detection model is still loading');
+            toast.error('Face detection model is still loading. Please wait.');
             return;
         }
 
@@ -164,9 +233,11 @@ const AppContextProvider = (props) => {
         setCredit,
         loadCreditsData,
         backendUrl,
-        image, setImage,
+        image, 
+        setImage,
         processImage,
-        resultImage, setResultImage,
+        resultImage, 
+        setResultImage,
         isProcessing,
         processingStep,
         isConverting,
@@ -182,4 +253,4 @@ const AppContextProvider = (props) => {
     )
 }
 
-export default AppContextProvider
+export default AppContextProvider;

@@ -4,6 +4,7 @@ import { AppContext } from '../context/AppContext'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'react-toastify'
 import { changePassportBackground } from '../utils/faceDetection'
+import { enhanceImage } from '../utils/imageEnhancement'
 
 const Result = () => {
   const { 
@@ -25,14 +26,10 @@ const Result = () => {
 
   const [selectedBackground, setSelectedBackground] = useState('#FFFFFF')
   const [customizedPassport, setCustomizedPassport] = useState(null)
-
-  const backgroundOptions = [
-    { label: 'White', value: '#FFFFFF' },
-    { label: 'Blue', value: '#0729D5' },
-    { label: 'Gray', value: '#C0C0C0' },
-    { label: 'Yellow', value: '#EBC22D' },
-    { label: 'Transparent', value: 'transparent' },
-  ]
+  const [isEnhancing, setIsEnhancing] = useState(false)
+  const [enhancedPassport, setEnhancedPassport] = useState(null)
+  const [isEnhanced, setIsEnhanced] = useState(false)
+  const [isChangingBackground, setIsChangingBackground] = useState(false)
 
   // Redirect if no image is selected
   useEffect(() => {
@@ -40,6 +37,16 @@ const Result = () => {
       navigate('/')
     }
   }, [image, navigate])
+
+  useEffect(() => {
+    if (passportImage) {
+      setCustomizedPassport(null);
+      setEnhancedPassport(null);
+      setSelectedBackground('#FFFFFF');
+      setIsEnhanced(false);
+      setIsChangingBackground(false);
+    }
+  }, [passportImage]);
 
   const handleNewImage = () => {
     fileInputRef.current.click()
@@ -53,9 +60,9 @@ const Result = () => {
         return;
       }
 
-      const maxSize = 5 * 1024 * 1024;
+      const maxSize = 30 * 1024 * 1024;
       if (file.size > maxSize) {
-        toast.error('Image size should be less than 5MB');
+        toast.error('Image size should be less than 30MB');
         return;
       }
 
@@ -71,36 +78,117 @@ const Result = () => {
     let fileExtension;
 
     if (imageType === 'passport') {
-        imageToDownload = customizedPassport || passportImage;
-        fileName = 'passport_photo';
-        fileExtension = selectedBackground === 'transparent' ? 'png' : 'jpg';
-    } else {
-        imageToDownload = resultImage;
-        fileName = 'removed_background';
-        fileExtension = 'png';
-    }
+        // Create a temporary canvas for high-quality export
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        const img = new Image();
+        img.crossOrigin = "Anonymous";
 
-    if (imageToDownload) {
+        img.onload = () => {
+            // Set canvas size to 35mm x 45mm at 300 DPI
+            // 35mm = 413 pixels, 45mm = 531 pixels at 300 DPI
+            canvas.width = 413;
+            canvas.height = 531;
+
+            // Enable high-quality image rendering
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+
+            // Draw the image
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+            // Create download link
+            const link = document.createElement('a');
+            
+            // Use PNG for transparent backgrounds, high-quality JPEG for colored backgrounds
+            if (selectedBackground === 'transparent') {
+                link.href = canvas.toDataURL('image/png', 1.0);
+                link.download = `passport_photo${enhancedPassport ? '_enhanced' : ''}.png`;
+            } else {
+                link.href = canvas.toDataURL('image/jpeg', 1.0);
+                link.download = `passport_photo${enhancedPassport ? '_enhanced' : ''}.jpg`;
+            }
+
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        };
+
+        // Load the current passport image
+        img.src = enhancedPassport || customizedPassport || passportImage;
+    } else {
+        // For background removed image, use PNG with maximum quality
         const link = document.createElement('a');
-        link.href = imageToDownload;
-        link.download = `${fileName}.${fileExtension}`;
+        link.href = resultImage;
+        link.download = 'removed_background.png';
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
     }
-  }
+  };
 
   const handleBackgroundChange = async (color) => {
-    if (!passportImage) return;
+    if (!passportImage || isEnhanced) {
+        if (isEnhanced) {
+            toast.info('Cannot change background after enhancement. Please convert image again to make changes.');
+        }
+        return;
+    }
     
     try {
+        if (isChangingBackground) return;
+        setIsChangingBackground(true);
+
         setSelectedBackground(color);
-        const newImage = await changePassportBackground(passportImage, color);
+        const sourceImage = passportImage;
+        const newImage = await changePassportBackground(sourceImage, color);
+        
         setCustomizedPassport(newImage);
     } catch (error) {
         console.error('Error changing background:', error);
+        toast.error('Failed to change background color');
+    } finally {
+        setTimeout(() => {
+            setIsChangingBackground(false);
+        }, 500);
     }
   };
+
+  const handleEnhanceImage = async () => {
+    if (!passportImage || isEnhanced) return;
+    
+    try {
+        setIsEnhancing(true);
+        const imageToEnhance = customizedPassport || passportImage;
+        const enhanced = await enhanceImage(imageToEnhance);
+        
+        const withBackground = await changePassportBackground(enhanced, selectedBackground);
+        setEnhancedPassport(withBackground);
+        setCustomizedPassport(withBackground);
+        
+        setIsEnhanced(true);
+        toast.success('Image enhanced successfully');
+    } catch (error) {
+        console.error('Error enhancing image:', error);
+        toast.error('Failed to enhance image');
+    } finally {
+        setIsEnhancing(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isConverting) {
+      setEnhancedPassport(null);
+      setCustomizedPassport(null);
+      setSelectedBackground('#FFFFFF');
+    }
+  }, [isConverting]);
+
+  const EnhancementBadge = () => (
+    <div className="absolute top-2 right-2 bg-green-500/80 text-white text-xs px-2 py-1 rounded-full">
+        Enhanced
+    </div>
+  );
 
   return (
     <div className='min-h-screen bg-dark'>
@@ -128,7 +216,7 @@ const Result = () => {
             <div className='relative overflow-hidden rounded-xl border border-gray-800 group-hover:border-purple-500/30 transition-all duration-500'>
               <img 
                 className='w-full object-contain rounded-xl transition-transform duration-500 group-hover:scale-105' 
-                src={image instanceof File ? URL.createObjectURL(image) : image} 
+                src={image instanceof File ? URL.createObjectURL(image) : (image || '')} 
                 alt="Original" 
               />
               <div className='absolute inset-0 border-2 border-purple-500/30 pointer-events-none'></div>
@@ -149,7 +237,7 @@ const Result = () => {
               ) : resultImage ? (
                 <img 
                   className='w-full object-contain rounded-xl transition-transform duration-500 group-hover:scale-105' 
-                  src={resultImage} 
+                  src={resultImage || ''} 
                   alt="Result" 
                 />
               ) : (
@@ -212,9 +300,10 @@ const Result = () => {
                   <div className='relative overflow-hidden rounded-xl border border-gray-800 group-hover:border-blue-500/30 transition-all duration-500'>
                     <img 
                       className='w-full object-contain rounded-xl transition-transform duration-500 group-hover:scale-105' 
-                      src={customizedPassport || passportImage} 
+                      src={customizedPassport || enhancedPassport || passportImage} 
                       alt="Passport Size" 
                     />
+                    {enhancedPassport && <EnhancementBadge />}
                     <div className='absolute inset-0 border-2 border-blue-500/30 pointer-events-none'></div>
                   </div>
                   
@@ -228,6 +317,30 @@ const Result = () => {
                     >
                       Download Photo
                     </button>
+
+                    <button 
+                      onClick={handleEnhanceImage}
+                      disabled={isEnhancing || !passportImage || isEnhanced || selectedBackground === '#FFFFFF'}
+                      className={`flex-1 px-8 py-2.5 rounded-full text-sm
+                        ${isEnhancing || !passportImage || isEnhanced || selectedBackground === '#FFFFFF'
+                            ? 'bg-gray-600 cursor-not-allowed' 
+                            : 'bg-gradient-to-r from-emerald-500 to-green-500 hover:from-green-500 hover:to-emerald-500'
+                        } transition-all duration-300 hover:scale-105`}
+                      title={selectedBackground === '#FFFFFF' ? 'Please select a background color first' : ''}
+                    >
+                      {isEnhancing ? (
+                        <div className="flex items-center justify-center gap-2">
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          <span>Enhancing...</span>
+                        </div>
+                      ) : isEnhanced ? (
+                        'Already Enhanced'
+                      ) : selectedBackground === '#FFFFFF' ? (
+                        'Select Background First'
+                      ) : (
+                        'Enhance Quality'
+                      )}
+                    </button>
                   </div>
                 </div>
               </div>
@@ -238,41 +351,48 @@ const Result = () => {
                   Background Color
                 </h3>
                 <div className='space-y-3'>
-                  {backgroundOptions.map((option) => (
-                    <button
-                      key={option.value}
-                      onClick={() => handleBackgroundChange(option.value)}
-                      className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-all duration-300 
-                        ${selectedBackground === option.value 
-                          ? 'bg-blue-500/20 border border-blue-500/50' 
-                          : 'hover:bg-gray-800/50 border border-gray-700'}`}
-                    >
-                      <div 
-                        className={`w-6 h-6 rounded border border-gray-600 ${
-                          option.value === 'transparent' ? 'repeating-crisscross-pattern' : ''
-                        }`}
-                        style={{
-                          backgroundColor: option.value === 'transparent' ? 'transparent' : option.value,
-                        }}
-                      />
-                      <span className='text-sm text-neutral-300'>
-                        {option.label}
-                      </span>
-                    </button>
-                  ))}
-                  
                   {/* Custom Color Input */}
-                  <div className='mt-4'>
+                  <div>
                     <label className='text-sm text-neutral-400 block mb-2'>
-                      Custom Color
+                      Select Background Color
                     </label>
                     <input 
                       type="color" 
                       value={selectedBackground === 'transparent' ? '#FFFFFF' : selectedBackground}
                       onChange={(e) => handleBackgroundChange(e.target.value)}
-                      className='w-full h-10 rounded cursor-pointer'
+                      disabled={isEnhanced}
+                      className={`w-full h-12 rounded cursor-pointer ${isEnhanced ? 'opacity-50 cursor-not-allowed' : ''}`}
                     />
+                    {isEnhanced ? (
+                      <p className="text-xs text-orange-400 mt-2">
+                        Background cannot be changed after enhancement
+                      </p>
+                    ) : (
+                      <p className="text-xs text-neutral-500 mt-2">
+                        Click to choose your preferred background color
+                      </p>
+                    )}
                   </div>
+
+                  {/* Transparent Option */}
+                  <button
+                    onClick={() => handleBackgroundChange('transparent')}
+                    disabled={isChangingBackground || isEnhanced}
+                    className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-all duration-300 
+                      ${(isChangingBackground || isEnhanced) ? 'opacity-50 cursor-not-allowed' : ''}
+                      ${selectedBackground === 'transparent' 
+                        ? 'bg-blue-500/20 border border-blue-500/50' 
+                        : 'hover:bg-gray-800/50 border border-gray-700'}`}
+                    title={isEnhanced ? 'Cannot change background after enhancement' : ''}
+                  >
+                    <div className='w-6 h-6 rounded border border-gray-600 repeating-crisscross-pattern'/>
+                    <span className='text-sm text-neutral-300'>
+                      Transparent
+                    </span>
+                    {isEnhanced && selectedBackground === 'transparent' && (
+                      <span className="ml-auto text-xs text-green-400">✓</span>
+                    )}
+                  </button>
                 </div>
               </div>
             </div>

@@ -61,7 +61,8 @@ const Navbar = () => {
                                 src={assets.credit_icon} alt="" />
                             <p className='text-sm sm:text-sm font-medium bg-gradient-to-r from-blue-200 to-blue-100 
                                 bg-clip-text text-transparent'>
-                                Credits: {credit}
+                                {credit}
+                                <span className='max-sm:hidden'> Credits</span>
                             </p>
                         </div>
                         
