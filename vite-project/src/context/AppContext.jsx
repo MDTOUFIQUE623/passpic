@@ -48,15 +48,22 @@ const AppContextProvider = (props) => {
         }
         
         try {
+            console.log('Loading credits data...');
             const token = await getToken();
-            if (!token) throw new Error('Authentication token not available');
+            if (!token) {
+                console.error('No authentication token available');
+                throw new Error('Authentication token not available');
+            }
             
             const response = await axios.get(`${backendUrl}/api/user/credits`, {
                 headers: { 
-                    token,
+                    'token': token,
                     'Content-Type': 'application/json'
-                }
+                },
+                timeout: 10000 // 10 second timeout
             });
+
+            console.log('Credits response:', response.data);
 
             if (response.data.success) {
                 setCredit(response.data.credits);
@@ -65,14 +72,37 @@ const AppContextProvider = (props) => {
             }
         } catch (error) {
             console.error("Error loading credits:", error);
-            toast.error(error.message || "Failed to load credits. Please try again.");
+            
+            let errorMessage = 'Failed to load credits';
+            if (error.response) {
+                errorMessage = error.response.data?.message || errorMessage;
+            } else if (error.request) {
+                errorMessage = 'Network error - please check your connection';
+            }
+            
+            toast.error(errorMessage);
             setCredit(null);
         }
     };
 
     useEffect(() => {
         if (isSignedIn) {
-            loadCreditsData();
+            let retryCount = 0;
+            const maxRetries = 3;
+            
+            const loadWithRetry = async () => {
+                try {
+                    await loadCreditsData();
+                } catch (error) {
+                    if (retryCount < maxRetries) {
+                        retryCount++;
+                        console.log(`Retrying credit load (${retryCount}/${maxRetries})...`);
+                        setTimeout(loadWithRetry, 2000 * retryCount); // Exponential backoff
+                    }
+                }
+            };
+            
+            loadWithRetry();
         } else {
             setCredit(null);
         }

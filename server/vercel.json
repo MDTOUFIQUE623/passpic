@@ -12,34 +12,19 @@
     ],
     "routes": [
         {
-            "src": "/api/health",
-            "dest": "/server.js"
-        },
-        {
-            "src": "/api/user/(.*)",
-            "dest": "/server.js"
-        },
-        {
-            "src": "/api/image/(.*)",
-            "dest": "/server.js"
-        },
-        {
-            "src": "/api/webhooks/(.*)",
-            "dest": "/server.js"
-        },
-        {
             "src": "/api/(.*)",
-            "dest": "/server.js"
-        },
-        {
-            "src": "/(.*)",
-            "status": 200,
-            "continue": true,
+            "dest": "/server.js",
+            "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
             "headers": {
                 "Access-Control-Allow-Origin": "*",
                 "Access-Control-Allow-Headers": "Origin, X-Requested-With, Content-Type, Accept, token, x-api-key",
-                "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS"
+                "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+                "Access-Control-Allow-Credentials": "true"
             }
+        },
+        {
+            "src": "/(.*)",
+            "dest": "/server.js"
         }
     ],
     "env": {

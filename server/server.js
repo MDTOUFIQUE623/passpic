@@ -19,10 +19,14 @@ const corsOptions = {
     origin: ['http://localhost:5173', 'https://passpic-omega.vercel.app', 'https://passpic-ochre.vercel.app'],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'token', 'x-api-key'],
-    credentials: true
+    credentials: true,
+    preflightContinue: true
 };
 
 app.use(cors(corsOptions));
+
+// Add OPTIONS handling for preflight requests
+app.options('*', cors(corsOptions));
 
 // Request logging middleware
 app.use((req, res, next) => {
