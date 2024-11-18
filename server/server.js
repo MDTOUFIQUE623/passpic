@@ -7,6 +7,7 @@ import webhookRouter from './routes/webhookRoutes.js'
 import imageRouter from './routes/imageRoutes.js'
 import errorHandler from './middlewares/errorHandler.js'
 import mlErrorHandler from './middlewares/mlErrorHandler.js'
+import path from 'path'
 
 const app = express()
 
@@ -15,7 +16,7 @@ console.log('Initializing server...');
 
 // CORS configuration
 const corsOptions = {
-    origin: ['http://localhost:5173', 'https://passpic-omega.vercel.app'],
+    origin: ['http://localhost:5173', 'https://passpic-omega.vercel.app', 'https://passpic-ochre.vercel.app'],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'token', 'x-api-key'],
     credentials: true
@@ -42,14 +43,12 @@ let isConnected = false;
 // Connect to MongoDB (with connection reuse for serverless)
 const connectToDb = async () => {
     if (isConnected) {
-        console.log('Using existing database connection');
         return;
     }
 
     try {
         await connectDB();
         isConnected = true;
-        console.log('Database connection established');
     } catch (error) {
         console.error('Database connection error:', error);
         throw error;
@@ -61,18 +60,14 @@ connectToDb().catch(err => {
     console.error('Initial database connection failed:', err);
 });
 
-// Middleware to ensure DB connection
-app.use(async (req, res, next) => {
-    try {
-        await connectToDb();
-        next();
-    } catch (error) {
-        console.error('Database connection middleware error:', error);
-        res.status(500).json({ 
-            success: false, 
-            message: 'Database connection failed' 
-        });
-    }
+// Root route handler
+app.get('/', (req, res) => {
+    res.json({ 
+        success: true, 
+        message: 'Welcome to PassPic API',
+        documentation: '/api/docs',
+        health: '/api/health'
+    });
 });
 
 // Base API route
@@ -104,12 +99,21 @@ app.use('/api/image', imageRouter);
 app.use(mlErrorHandler);
 app.use(errorHandler);
 
-// Handle 404 - Keep this as the last route
-app.use((req, res) => {
-    console.log(`404 - Route not found: ${req.method} ${req.originalUrl}`);
+// Handle 404 for API routes only
+app.use('/api/*', (req, res) => {
+    console.log(`404 - API route not found: ${req.method} ${req.originalUrl}`);
     res.status(404).json({ 
         success: false, 
-        message: `Route not found: ${req.method} ${req.originalUrl}`,
+        message: `API route not found: ${req.method} ${req.originalUrl}`,
+        timestamp: new Date().toISOString()
+    });
+});
+
+// For all other routes, return success
+app.use('*', (req, res) => {
+    res.json({ 
+        success: true, 
+        message: 'PassPic Service',
         timestamp: new Date().toISOString()
     });
 });
