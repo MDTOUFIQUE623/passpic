@@ -3,7 +3,7 @@ import mongoose from "mongoose";
 const connectDB = async () => {
     try {
         if (mongoose.connections[0].readyState) {
-            console.log("Already connected to MongoDB");
+            console.log("Using existing MongoDB connection");
             return;
         }
 
@@ -11,18 +11,38 @@ const connectDB = async () => {
             throw new Error('MONGODB_URI is not defined in environment variables');
         }
 
-        const conn = await mongoose.connect(process.env.MONGODB_URI, {
+        const options = {
             useNewUrlParser: true,
             useUnifiedTopology: true,
-            dbName: 'passpic'
-        });
+            dbName: 'passpic',
+            serverSelectionTimeoutMS: 5000,
+            socketTimeoutMS: 45000,
+            family: 4
+        };
+
+        const conn = await mongoose.connect(process.env.MONGODB_URI, options);
         
         console.log(`MongoDB Connected: ${conn.connection.host}`);
-        console.log(`Database: ${conn.connection.db.databaseName}`);
+        
+        // Handle connection errors
+        mongoose.connection.on('error', (err) => {
+            console.error('MongoDB connection error:', err);
+        });
+
+        mongoose.connection.on('disconnected', () => {
+            console.log('MongoDB disconnected');
+        });
+
+        // Graceful shutdown
+        process.on('SIGINT', async () => {
+            await mongoose.connection.close();
+            process.exit(0);
+        });
+
     } catch (error) {
         console.error("MongoDB connection error:", error);
-        process.exit(1);
+        throw error;
     }
-}
+};
 
 export default connectDB;
