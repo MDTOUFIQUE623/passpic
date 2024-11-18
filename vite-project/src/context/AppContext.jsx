@@ -45,11 +45,19 @@ const AppContextProvider = (props) => {
             if (!isSignedIn) return;
             
             const token = await getToken();
-            const response = await axios.get(`${backendUrl}/api/user/credits`, {
+            
+            // Configure axios defaults
+            axios.defaults.withCredentials = true;
+            
+            const response = await axios({
+                method: 'get',
+                url: `${backendUrl}/api/user/credits`,
                 headers: { 
                     token,
-                    'Content-Type': 'application/json'
-                }
+                    'Content-Type': 'application/json',
+                    'Access-Control-Allow-Origin': '*'
+                },
+                withCredentials: true
             });
 
             if (response.data.success) {
@@ -87,22 +95,11 @@ const AppContextProvider = (props) => {
             const formData = new FormData();
             formData.append('image', image);
 
-            // Log the image details
-            console.log('Image being uploaded:', {
-                type: image.type,
-                size: image.size,
-                name: image.name
-            });
-
             setProcessingStep('Removing background...');
             const token = await getToken();
             
-            // Log the request details
-            console.log('Request details:', {
-                url: `${backendUrl}/api/image/remove-bg`,
-                token: token ? 'Present' : 'Missing',
-                imageSize: image.size
-            });
+            // Configure axios defaults
+            axios.defaults.withCredentials = true;
             
             const response = await axios({
                 method: 'post',
@@ -110,8 +107,10 @@ const AppContextProvider = (props) => {
                 data: formData,
                 headers: { 
                     'token': token,
-                    'Content-Type': 'multipart/form-data'
+                    'Content-Type': 'multipart/form-data',
+                    'Access-Control-Allow-Origin': '*'
                 },
+                withCredentials: true,
                 maxContentLength: Infinity,
                 maxBodyLength: Infinity
             });
