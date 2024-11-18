@@ -28,27 +28,13 @@ app.use(express.urlencoded({ limit: '30mb', extended: true }));
 // Special handling for webhook routes
 app.use('/api/webhooks', express.raw({ type: 'application/json' }));
 
-// Connect to MongoDB
-let isConnected = false;
-const connectToDb = async () => {
-    if (isConnected) return;
-    try {
-        await connectDB();
-        isConnected = true;
-    } catch (error) {
-        console.error('MongoDB connection error:', error);
-        throw error;
-    }
-};
-
-// Middleware to ensure DB connection
-app.use(async (req, res, next) => {
-    try {
-        await connectToDb();
-        next();
-    } catch (error) {
-        next(error);
-    }
+// Initialize MongoDB connection immediately
+console.log('Initializing server...');
+connectDB().then(() => {
+    console.log('Initial database connection established');
+}).catch(err => {
+    console.error('Failed to establish initial database connection:', err);
+    process.exit(1);
 });
 
 // Routes
