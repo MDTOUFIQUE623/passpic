@@ -84,15 +84,25 @@ const AppContextProvider = (props) => {
             navigate('/result');
 
             setProcessingStep('Preparing image...');
-
-            // Create form data
             const formData = new FormData();
             formData.append('image', image);
+
+            // Log the image details
+            console.log('Image being uploaded:', {
+                type: image.type,
+                size: image.size,
+                name: image.name
+            });
 
             setProcessingStep('Removing background...');
             const token = await getToken();
             
-            console.log('Making request to:', `${backendUrl}/api/image/remove-bg`);
+            // Log the request details
+            console.log('Request details:', {
+                url: `${backendUrl}/api/image/remove-bg`,
+                token: token ? 'Present' : 'Missing',
+                imageSize: image.size
+            });
             
             const response = await axios({
                 method: 'post',
@@ -106,25 +116,29 @@ const AppContextProvider = (props) => {
                 maxBodyLength: Infinity
             });
 
-            const { data } = response;
-            console.log('Response:', data);
+            console.log('Response:', response.data);
 
-            if (!data.success) {
-                throw new Error(data.message || 'Failed to process image');
+            if (!response.data.success) {
+                throw new Error(response.data.message || 'Failed to process image');
             }
 
-            setResultImage(data.resultImage);
-            data.creditBalance && setCredit(data.creditBalance);
+            setResultImage(response.data.resultImage);
+            if (response.data.creditBalance) {
+                setCredit(response.data.creditBalance);
+            }
             toast.success('Background removed successfully!');
             
         } catch (error) {
-            console.error('Error processing image:', error);
+            console.error('Error details:', {
+                message: error.message,
+                response: error.response?.data,
+                status: error.response?.status
+            });
+            
             if (error.response) {
-                console.error('Error response:', error.response.data);
                 toast.error(error.response.data.message || 'Server error');
             } else if (error.request) {
-                console.error('No response received:', error.request);
-                toast.error('Network error. Please check your connection.');
+                toast.error('Network error. Please check your connection and try again.');
             } else {
                 toast.error(error.message || 'Failed to process image');
             }

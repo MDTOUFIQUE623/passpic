@@ -13,10 +13,13 @@ const app = express()
 app.use(cors({
     origin: ['http://localhost:5173', 'https://passpic-omega.vercel.app'],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'token', 'x-api-key']
+    allowedHeaders: ['Content-Type', 'Authorization', 'token', 'x-api-key'],
+    credentials: true,
+    maxAge: 86400 // 24 hours
 }));
 
-app.use(express.json({ limit: '10mb' }))
+app.use(express.json({ limit: '50mb' }))
+app.use(express.urlencoded({ extended: true, limit: '50mb' }))
 app.use('/api/webhooks', express.raw({ type: 'application/json' }))
 
 // Connect to MongoDB

@@ -7,28 +7,37 @@ const authUser = async (req, res, next) => {
         if (!token) {
             return res.status(401).json({
                 success: false,
-                message: "Not Authorized, Login Again"
+                message: "Authentication token is required"
             });
         }
 
-        // Decode the token to get clerkId
+        // Log token details (without exposing sensitive data)
+        console.log('Token received:', {
+            length: token.length,
+            type: typeof token
+        });
+
         const decoded = jwt.decode(token);
         
-        if (!decoded || !decoded.sub) {  // Clerk uses 'sub' for the user ID
+        if (!decoded || !decoded.sub) {
             return res.status(401).json({
                 success: false,
-                message: "Invalid token"
+                message: "Invalid token format"
             });
         }
 
-        req.body.clerkId = decoded.sub;  // Use 'sub' as clerkId
+        req.body.clerkId = decoded.sub;
         next();
 
     } catch (error) {
-        console.error('Auth middleware error:', error);
+        console.error('Auth middleware error:', {
+            message: error.message,
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
+        
         res.status(401).json({
             success: false,
-            message: error.message || "Authentication failed"
+            message: "Authentication failed: " + error.message
         });
     }
 };
