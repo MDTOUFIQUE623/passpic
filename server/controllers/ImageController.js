@@ -1,5 +1,4 @@
 import axios from "axios";
-import fs from 'fs'
 import FormData from "form-data";
 import userModel from "../models/userModel.js";
 
@@ -23,18 +22,16 @@ const removeBgImage = async (req, res) => {
         // Check file size (30MB limit for ClipDrop API)
         const maxSize = 30 * 1024 * 1024; // 30MB
         if (req.file.size > maxSize) {
-            fs.unlinkSync(req.file.path);
             return res.json({ 
                 success: false, 
                 message: "File size too large. Maximum size is 30MB" 
             });
         }
 
-        const imagePath = req.file.path;
-        const imageFile = fs.createReadStream(imagePath);
-
         const formdata = new FormData();
-        formdata.append('image_file', imageFile, {
+        
+        // Use the buffer from memory storage
+        formdata.append('image_file', req.file.buffer, {
             filename: req.file.originalname,
             contentType: req.file.mimetype
         });
@@ -62,7 +59,6 @@ const removeBgImage = async (req, res) => {
             }
         );
 
-        // Log API response details
         console.log('ClipDrop API Response:', {
             remainingCredits: headers['x-remaining-credits'],
             creditsConsumed: headers['x-credits-consumed'],
@@ -83,9 +79,6 @@ const removeBgImage = async (req, res) => {
             { new: true }
         );
 
-        // Clean up the temporary file
-        fs.unlinkSync(imagePath);
-
         return res.json({
             success: true,
             resultImage,
@@ -101,14 +94,6 @@ const removeBgImage = async (req, res) => {
             status: error.response?.status,
             headers: error.response?.headers
         });
-        
-        if (req.file && req.file.path) {
-            try {
-                fs.unlinkSync(req.file.path);
-            } catch (unlinkError) {
-                console.error('Error deleting temporary file:', unlinkError);
-            }
-        }
 
         let errorMessage = 'Failed to process image';
         
@@ -123,7 +108,6 @@ const removeBgImage = async (req, res) => {
                 errorMessage = 'Too many requests. Please try again later';
             }
             
-            // If response contains JSON error message
             if (error.response.data) {
                 try {
                     const errorData = JSON.parse(error.response.data.toString());
