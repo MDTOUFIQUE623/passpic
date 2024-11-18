@@ -2,7 +2,10 @@ import mongoose from "mongoose";
 
 const connectDB = async () => {
     try {
+        console.log('Attempting MongoDB connection...');
+
         if (!process.env.MONGODB_URI) {
+            console.error('MONGODB_URI is missing from environment variables');
             throw new Error('MONGODB_URI is not defined');
         }
 
@@ -22,9 +25,11 @@ const connectDB = async () => {
             return mongoose.connections[0];
         }
 
+        console.log('Creating new MongoDB connection...');
         const conn = await mongoose.connect(process.env.MONGODB_URI, options);
         
-        console.log('MongoDB Connected');
+        console.log(`MongoDB Connected to: ${conn.connection.host}`);
+        console.log(`Database: ${conn.connection.name}`);
 
         mongoose.connection.on('error', (err) => {
             console.error('MongoDB connection error:', err);
@@ -34,9 +39,14 @@ const connectDB = async () => {
             console.log('MongoDB disconnected');
         });
 
+        mongoose.connection.on('connected', () => {
+            console.log('MongoDB connected');
+        });
+
         return conn;
     } catch (error) {
         console.error("MongoDB connection error:", error);
+        console.error('Error details:', error.message);
         throw error;
     }
 };

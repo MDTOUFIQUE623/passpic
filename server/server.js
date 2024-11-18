@@ -10,6 +10,9 @@ import mlErrorHandler from './middlewares/mlErrorHandler.js'
 
 const app = express()
 
+// Initialize server
+console.log('Initializing server...');
+
 // CORS configuration
 const corsOptions = {
     origin: ['http://localhost:5173', 'https://passpic-omega.vercel.app'],
@@ -46,6 +49,11 @@ const connectToDb = async () => {
         throw error;
     }
 };
+
+// Initial database connection
+connectToDb().catch(err => {
+    console.error('Initial database connection failed:', err);
+});
 
 // Middleware to ensure DB connection
 app.use(async (req, res, next) => {
@@ -87,10 +95,18 @@ app.use((req, res) => {
     });
 });
 
-// For local development
+// Start server
+const PORT = process.env.PORT || 4000;
+
 if (process.env.NODE_ENV !== 'production') {
-    const PORT = process.env.PORT || 4000;
-    app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+    app.listen(PORT, () => {
+        console.log(`Server is running on port ${PORT}`);
+        console.log(`Environment: ${process.env.NODE_ENV}`);
+    });
+} else {
+    app.listen(PORT, () => {
+        console.log('Server started in production mode');
+    });
 }
 
 export default app;
